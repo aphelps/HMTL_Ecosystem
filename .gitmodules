@@ -1,0 +1,15 @@
+[submodule "HMTL"]
+	path = HMTL
+	url = git@github.com:HMTL/HMTL.git
+[submodule "CircularController"]
+	path = CircularController
+	url = git@github.com:aphelps/CircularController.git
+[submodule "HMTL_Fire_Control"]
+	path = HMTL_Fire_Control
+	url = git@github.com:HMTL/HMTL_Fire_Control.git
+[submodule "DistributedArt/DistributedArtFlask"]
+	path = DistributedArt/DistributedArtFlask
+	url = git@github.com:aphelps/DistributedArtFlask.git
+[submodule "DistributedArt/DistributedArtPi"]
+	path = DistributedArt/DistributedArtPi
+	url = git@github.com:aphelps/DistributedArtPi.git
