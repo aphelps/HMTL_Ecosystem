@@ -3,4 +3,7 @@
 .DS_Store
 todo.md
 todo.log
+todo.interval
 todo_plans/
+todo.state
+todo.lock
