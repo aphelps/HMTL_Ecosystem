@@ -45,6 +45,44 @@ make HMTL_Fire_Control
 make CircularController
 ```
 
+## Testing
+
+All tests run without hardware. The ecosystem uses three complementary tracks across two submodules.
+
+### Tracks
+
+| Track | What it tests | HMTL | HMTL_Fire_Control |
+|---|---|---|---|
+| **Python emulator** | Protocol, message routing, config — pure Python | `make test-python` | `make test-python` |
+| **C++ native** | Firmware logic (programs, outputs, manager) compiled for desktop via PlatformIO + Unity | `make test-native` | `make test-native` |
+| **AVR build check** | Real `avr-gcc` compile of the main firmware sketch | `make test-simavr` | — |
+
+### Running tests
+
+```bash
+# All tests across all submodules
+make test
+
+# One submodule
+cd HMTL && make test
+cd HMTL_Fire_Control && make test
+```
+
+### Coverage
+
+```bash
+# All coverage across all submodules (Python + C++)
+make coverage
+
+# Split by language
+make coverage-python
+make coverage-native
+
+# One submodule
+cd HMTL && make coverage
+cd HMTL_Fire_Control && make coverage
+```
+
 ## Architecture
 
 HMTL modules are Arduino-class microcontrollers (ATmega328P, ATmega1284P, ESP32, Moteino) that communicate over a shared bus. Each module has a set of **outputs** configured in EEPROM and responds to a binary message protocol over RS485, XBee, RFM69, or serial/Bluetooth.
@@ -95,19 +133,7 @@ python bin/Scan.py                # discover modules on network
 
 Module configs (one JSON file per physical device) live in `HMTL/python/configs/`. Load them onto hardware using the `HMTLPythonConfig` firmware sketch together with `HMTLConfig.py`.
 
-### Testing
-
-Three complementary tracks — all pass without hardware:
-
-| Track | What it tests | Command |
-|---|---|---|
-| Python emulator | Protocol + message routing in pure Python | `cd HMTL && make test-python` |
-| C++ native | Firmware logic (programs, manager, types) compiled for desktop | `cd HMTL && make test-native` |
-| AVR build check | Real avr-gcc compile of the main firmware | `cd HMTL && make test-simavr` |
-
-```bash
-cd HMTL && make test    # all three
-```
+See [Testing](#testing) above for per-track commands.
 
 ## Fire Control (`HMTL_Fire_Control/`)
 
