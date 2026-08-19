@@ -639,3 +639,22 @@ defined safe terminal state, not just a safe boot state.
 Bench-testable (adding to the joint checklist): after a simulated 3-fail exhaustion, observe the
 commanded valve state and confirm gas is NOT left flowing toward a (still-hot) igniter — on a
 bench-safe surrogate output, never live gas + HSI.
+
+**Session 11 correction — no-reset-on-connect was BROKEN, not just unproven (peer PR#14).**
+pyserial 3.5 open() writes DTR before RTS, so the client's pre-open dtr=False walked through
+DTR-low/RTS-high = ESP32 EN-low — the client asserted the reset line on every open. Confirmed by
+the peer with a red-then-green fix (dsrdtr=True pre-open). Tracing which of MY tools use that path:
+- HMTLCommandServer → SerialBuffer.py:30 opens with plain `serial.Serial(device, baud, ...)`, NO
+  pre-open DTR handling — so it DOES reset its serial device (cmdserver's FTFO9I0N) on connect.
+  But it connects ONCE and holds the port, so exposure is per-STARTUP, not per-poll.
+- soak2.py 72-serial fallback shells `bin/Scan -p 6000` → talks to cmdserver's NETWORK port 6000
+  (SocketBuffer), not a serial reopen. The 38 fallbacks reset NOTHING, and all clustered in the
+  ~03:17 power-cut window (03:19–10:54) when the UDP bridge was down.
+- capture_noreset.py (the FC capture, /dev/cu.usbserial-2110) is NOT the broken client — the
+  no-reset capture tool. So the FC's clean, reset-free capture stands.
+Net correction: my earlier "no discontinuity misattributed" HOLDS for the FC, and the 11:16/11:19
+FC resets remain reflash-attributed (cmdserver is a different device, started ~10:57). What I did
+NOT know before: the connect path was actively broken, so any of my tooling on the direct
+SerialBuffer path was resetting its board on connect until PR#14. Bounded here to cmdserver
+startups; no per-poll corruption. Banner check (checklist §10) now EXPECTED to fire on a
+pre-422ee12 build — run old vs new when the FC is free; old-resets/new-clean beats new-clean alone.
