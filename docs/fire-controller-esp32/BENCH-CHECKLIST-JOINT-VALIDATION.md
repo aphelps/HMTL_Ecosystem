@@ -112,18 +112,26 @@ requests safe-state from core 1 and blocks on the ack; ack timeout aborts (retry
       de-energising, so "retries stopped" is NOT "ignition impossible". Terminal state must be
       safe on its own, not rely on the igniter being off.
 
-## 10. Connect-does-not-reset — scope verification (PR#14 HMTLCommandServer, ESP32-over-USB)
-- [ ] [A] Scope on DTR, RTS, and EN during a client connect. The pre-open DTR/RTS settings +
-      HUPCL-clear are ASSERTED, not demonstrated — pyserial's open() DTR-then-RTS ordering can
-      still pass through an EN-low pulse. This scope trace is the ONLY thing that settles it;
-      do not carry "connect doesn't reset" as an assumption.
-- [ ] [C] Boot-line presence (NOT cause) is the only usable serial cross-check: if a connect
-      produces ANY ESP32 boot banner, a reset happened. The reset-CAUSE code CANNOT discriminate
-      here — an EN/DTR auto-reset reports `rst:0x1 (POWERON_RESET)`, the SAME code as a real power
-      cycle (the RTC can't tell "supply came up" from "EN released"; esptool resets show 0x1 too).
-      Only SW/watchdog classes (0x3 SW_RESET, 0xc SW_CPU_RESET, RTCWDT/TG*WDT) would discriminate,
-      and an EN reset produces none of them. So do NOT read an observed POWERON_RESET as evidence
-      of "no connect-reset" — it is neutral. [Correction 2026-08-19: an earlier note here called a
-      captured POWERON_RESET mild positive evidence; that was wrong — see above.]
+## 10. Connect-does-not-reset (PR#14 HMTLCommandServer, ESP32-over-USB)
+
+Run cheapest-first: the banner check may make the scope trip unnecessary.
+
+- [ ] [C] **Banner check (cheap, run first).** Connect with the new client while watching the FC
+      serial stream. If a boot banner appears, a reset HAPPENED — done, no scope needed, and the
+      no-reset guarantee is refuted. Asymmetry, state precisely: presence PROVES a reset; absence
+      does NOT prove no reset. The reset pulse is at open(), so there is a race between the port
+      becoming readable and the banner being emitted — a banner can be partly or wholly missed.
+      One clean connect is suggestive, several more so, but a missed banner is indistinguishable
+      from no reset on the screen alone.
+- [ ] [A] **Scope (the settler, only if the banner check is clean).** Scope DTR, RTS, and EN
+      during a connect. The pre-open DTR/RTS settings + HUPCL-clear are ASSERTED, not demonstrated
+      — pyserial's open() DTR-then-RTS ordering can still pass an EN-low pulse. This trace is the
+      only thing that distinguishes "no reset" from "reset whose banner I missed".
+- [ ] [C] Reset-CAUSE code does NOT help here: an EN/DTR auto-reset reports `rst:0x1
+      (POWERON_RESET)`, the SAME code as a real power cycle (RTC can't tell "supply came up" from
+      "EN released"; esptool resets show 0x1 too). Only SW/watchdog classes (0x3 SW_RESET, 0xc
+      SW_CPU_RESET, RTCWDT/TG*WDT) discriminate, and an EN reset produces none — so do NOT read an
+      observed POWERON_RESET as "no connect-reset". [Correction 2026-08-19: an earlier note called
+      a captured POWERON_RESET mild positive evidence; that was wrong.]
 - [ ] [C] AVR DTR-cap reset is NOT software-suppressible — for AVR modules, connect WILL reset;
       plan captures around that (hold the port open across the whole sequence).
