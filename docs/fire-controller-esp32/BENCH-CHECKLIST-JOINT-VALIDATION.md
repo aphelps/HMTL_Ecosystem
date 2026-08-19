@@ -111,3 +111,13 @@ requests safe-state from core 1 and blocks on the ack; ack timeout aborts (retry
 - [ ] Note (HSI physics): the igniter stays ignition-capable for tens of seconds after
       de-energising, so "retries stopped" is NOT "ignition impossible". Terminal state must be
       safe on its own, not rely on the igniter being off.
+
+## 10. Connect-does-not-reset — scope verification (PR#14 HMTLCommandServer, ESP32-over-USB)
+- [ ] [A] Scope on DTR, RTS, and EN during a client connect. The pre-open DTR/RTS settings +
+      HUPCL-clear are ASSERTED, not demonstrated — pyserial's open() DTR-then-RTS ordering can
+      still pass through an EN-low pulse. This scope trace is the ONLY thing that settles it;
+      do not carry "connect doesn't reset" as an assumption.
+- [ ] [C] Cross-check: capture the ESP32 boot-cause line on the next connect. EN/DTR auto-reset
+      shows a software/EN reset cause; a clean connect shows none (no boot line at all). AVR
+      DTR-cap reset is NOT software-suppressible — for AVR modules, connect WILL reset; plan
+      captures around that (hold the port open across the whole sequence).
