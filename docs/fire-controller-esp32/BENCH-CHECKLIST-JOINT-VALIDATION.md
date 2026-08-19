@@ -145,11 +145,15 @@ Run cheapest-first: the banner check may make the scope trip unnecessary.
 - [ ] [C] AVR DTR-cap reset is NOT software-suppressible — for AVR modules, connect WILL reset;
       plan captures around that (hold the port open across the whole sequence).
 
-## 11. Frame-truncation resync (PR#14 d27b320 — PROVISIONAL, pending re-review confirmation)
-Status: the fix (truncated frame at a read boundary → reader resynchronises past it instead of
-dying or silently dropping the body) was INFERRED from the diff by the peer session (no skip
-markers + a resync test present), NOT yet re-reviewed. Treat this item as provisional; the peer
-will confirm or report the fix is narrower than it looks. Do not run/rely on it as settled until then.
+## 11. Frame-truncation resync (PR#14 d27b320 — CONFIRMED by independent re-review 2026-08-19)
+The fix is verified real (not an xfail): truncated frame at a read boundary → reader resynchronises
+past it instead of dying or silently dropping the body. The new unit guard uses a 12-byte
+body-bearing frame, RED at all six split offsets against 422ee12, GREEN on d27b320; chunked
+assembly still assembles, a genuinely corrupt frame is still abandoned (bounded patience), rewind
+terminates. Scope contained to InputBuffer._read_item() + tests + README.
+Maintenance tripwire (from the re-review, if §11 ever grows to cover the abandonment path): the
+abandonment test's `MAX_PARTIAL_FRAME_READS + 2` margin is load-bearing — retune MAX_PARTIAL_FRAME_READS
+and that test needs revisiting rather than silently still passing.
 - [ ] [C] Send a BODY-BEARING frame (NOT a poll — a poll is exactly 8 bytes and straddles nothing,
       which is how the original guard was vacuous) engineered to straddle a serial read boundary
       into 72's bridge path.
