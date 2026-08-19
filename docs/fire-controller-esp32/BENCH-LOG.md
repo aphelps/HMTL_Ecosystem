@@ -563,11 +563,13 @@ finding had conflated:
   such a message; a routine "all outputs off" hits it). Zero adversaries required. Primary fix is
   module-side (exclude PILOT/IGNITER/POOF from fan-out — in the pilot-flame plan); the bridge's
   share is to not transparently relay an actuator-class ALL_OUTPUTS frame, kept consistent with it.
-Related CRC point (peer's, module-side but same "not security" logic): the HMTL CRC is written
-but never verified on receive, and here that's a PHYSICS problem not a malice one — the spark
-igniter fires on the same board as the RS485 transceiver, so ignition-time bit errors are the
-EXPECTED case; a corrupted frame decoding as override-enable is a noise hazard. The
-magic-plus-complement override payload requirement stays for that reason. Pull-down/watchdog
+Related CRC point (peer's, module-side): the HMTL CRC is written but never verified on receive.
+~~[CORRECTED — see session 11 EMC correction below] Earlier framing claimed ignition-time bit
+errors are the EXPECTED case because a spark igniter fires on the same board as the RS485
+transceiver, justifying the magic-plus-complement override payload as noise rejection.~~ This
+premise is FALSE: the igniter is a HOT-SURFACE IGNITER (resistive heater), not a spark gap, so
+it radiates no broadband RF. The CRC/complement requirement no longer has an established
+justification and goes to Adam as "re-justify or drop" (see correction below). Pull-down/watchdog
 floor unchanged and still with Adam.
 
 ---
@@ -588,3 +590,32 @@ For Adam at the bench: worth reseating 129's bus connector / checking its termin
 cheapest thing that fits the signature. Not urgent (no actuator or safety path affected). Will
 push a notification only if 129 goes fully offline (as 96 did on the overnight power cut) or the
 loss rate stays sustained >60%.
+
+---
+
+## Session 11b — 2026-08-19: EMC framing CORRECTED (Adam: it's a hot-surface igniter)
+
+Correcting a factual error I put into session 10 rather than let it propagate. Adam clarified the
+igniter is a **hot-surface igniter (HSI)** — a resistive SiC/SiN element that glows — NOT a spark
+generator. That invalidates the "EMC / radiated-RF" justification I wrote for the CRC + magic-plus-
+complement override payload: a resistive heater is not an arc source and does not radiate the
+broadband RF a spark gap does. The peer's earlier "physics not malice" phrasing was the same error;
+both are retracted.
+
+- What SURVIVES (weaker, different in kind): an HSI draws meaningful current, so switching it is a
+  CONDUCTED transient / possible supply droop, not radiated EMI. That can still corrupt a frame but
+  is a weaker argument and points at supply decoupling + sequencing as much as at frame validation.
+- CONSEQUENCE: with security de-scoped AND the radiated-EMI premise false, the CRC/complement
+  requirement has no justification we've actually established. NOT being deleted quietly, NOT kept
+  on a known-wrong premise — goes to Adam as "re-justify (conducted-transient is the candidate) or
+  drop." Peer is folding this into round-2.
+
+Two HSI facts that matter MORE than the CRC point (peer logged both on the pilot-flame task):
+1. The 15 s energisation is APPROPRIATE, not suspicious — HSIs need ~15–60 s to reach ignition
+   temperature. Open BENCH question for me (hardware, not design): SiC igniters degrade with
+   thermal cycling, so **cycle life under repeated 15 s energisations** is worth measuring on the
+   bench once hardware is in.
+2. SAFETY-RELEVANT — an HSI **stays hot for tens of seconds after de-energising** and can still
+   ignite gas while cooling. So a 30 s inter-trial gap is NOT a window where ignition is impossible.
+   Any purge premised on "igniter off ⇒ no ignition source" is wrong; safe ordering is close-gas-
+   then-wait, not treating the gap as inert. Bears on Adam's open purge question.
