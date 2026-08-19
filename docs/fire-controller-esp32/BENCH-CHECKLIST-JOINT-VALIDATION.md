@@ -102,3 +102,12 @@ requests safe-state from core 1 and blocks on the ack; ack timeout aborts (retry
       Still responsive ⇒ RS485 frame loss becomes lead suspect for the field symptom.
 - [ ] [C] FIXED firmware (when the P1 lands): same fault ⇒ pads treated released, cancels sent
       automatically, no operator action needed.
+
+## 9. Failed-ignition terminal state (when pilot supervision lands; SAFETY)
+- [ ] [C] Drive a simulated 3-attempt ignition FAILURE (surrogate output — LED/bench load, NEVER
+      live gas + HSI). Observe: after retries exhaust, is the pilot valve still COMMANDED OPEN?
+- [ ] [C] Confirm the design's terminal state does not leave gas commanded toward a still-hot
+      igniter — i.e. the failed-sequence resting state is gas-OFF, not gas-flowing-with-module-idle.
+- [ ] Note (HSI physics): the igniter stays ignition-capable for tens of seconds after
+      de-energising, so "retries stopped" is NOT "ignition impossible". Terminal state must be
+      safe on its own, not rely on the igniter being off.

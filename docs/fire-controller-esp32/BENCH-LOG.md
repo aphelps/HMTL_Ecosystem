@@ -619,3 +619,23 @@ Two HSI facts that matter MORE than the CRC point (peer logged both on the pilot
    ignite gas while cooling. So a 30 s inter-trial gap is NOT a window where ignition is impossible.
    Any purge premised on "igniter off ⇒ no ignition source" is wrong; safe ordering is close-gas-
    then-wait, not treating the gap as inert. Bears on Adam's open purge question.
+
+**Session 11b addendum — the still-hot fact is a DESIGN HAZARD, not a purge note.** Following the
+HSI cooldown through the current design rules (peer's escalation, going to Adam): after 3 failed
+attempts the module STOPS retrying, but under the rules as written it must never autonomously
+CLOSE the pilot valve — only never open it. So the terminal state of a failed ignition sequence
+is: **unburnt gas flowing toward a surface still hot enough to ignite it, with the module having
+deliberately stopped intervening.** That is delayed ignition of an accumulated cloud — the exact
+hazard conventional gas practice purges against — and worse with an HSI than a spark: a spark that
+stopped sparking is inert; an HSI that stopped being driven stays an ignition source for tens of
+seconds. This gap exists WHETHER OR NOT a purge is adopted, because "module never opens the pilot"
+says nothing about gas already flowing when retries exhaust; stopping the retries is what makes the
+hazard the RESTING state.
+Design-rule tension this surfaces (for Adam/round-3, peer's call to raise): the rule "module never
+closes the pilot valve autonomously" is precisely what makes the hazard terminal — it may conflict
+with fail-safe-close and need revisiting. Hardware floor connection: reinforces the default-CLOSED
+solenoid + pull-down argument (session 10), and adds that the pilot valve specifically needs a
+defined safe terminal state, not just a safe boot state.
+Bench-testable (adding to the joint checklist): after a simulated 3-fail exhaustion, observe the
+commanded valve state and confirm gas is NOT left flowing toward a (still-hot) igniter — on a
+bench-safe surrogate output, never live gas + HSI.
