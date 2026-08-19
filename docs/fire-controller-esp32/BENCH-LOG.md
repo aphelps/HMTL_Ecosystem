@@ -519,3 +519,35 @@ from logs either. Instrumentation gap noted on the P1 task: enable touch logging
 periodic touch-state sample line) in the next FC bench build so the predictions become
 answerable from captures. Joint-session MPR121 test gains an explicit observation step:
 **after the induced isolated fault, is the touch panel still responsive?** (prediction (c)).
+
+---
+
+## Session 10 — 2026-08-19 (off-bench): pilot-flame review fallout landing in bench territory
+
+The pilot-flame adversarial review came back CHANGES_SUGGESTED with a fatal design finding
+(peer's, module-side: drive-time override wrote the struct but `hmtl_update_output()` only runs
+under `if (update)`, so loss-of-flame-while-poofing was never pushed to the pin — being fixed by
+forcing update every non-permitted iteration, PWM timer holds the pin not the struct). Two of the
+review's findings land on hardware/bridge, which is this session's side:
+
+**1. Bridge amplifies the broadcast hazard off-bus (verified against source).** The peer found
+that one broadcast frame — address=ANY, output=HMTL_ALL_OUTPUTS(0xFE), value=255 — opens every
+pilot valve and igniter, because 0xFE fan-out reaches ungated actuator classes. My rs485_bridge
+makes this *reachable over WiFi without authentication*: serviceUdp() validates only frame
+STRUCTURE (startcode/version/length/CRC/size — rs485_bridge_protocol.h:259) and forwards using
+the frame's own destination, explicitly not rewriting addressing. No address allow-list, no
+output filter. So any device on Acropolis can open every gated output with one datagram to the
+bridge port. Filed P2 in WLED_dev todo (slug rs485-bridge-forwards-unauthenticated-broadcast-...);
+safety floor = refuse to forward broadcast/ANY-addressed or ALL_OUTPUTS frames, additive to
+validation, no config. Stronger options (address allow-list, UDP auth) recorded there too.
+
+**2. No watchdog + AVR reset tri-states pins (independently confirmed).** `grep -rn 'wdt_|watchdog'
+HMTL/` returns **zero** — verified this session. Any enforcement whose mechanism is "we rewrite
+the solenoid pin every loop pass" has no floor under it: a hang or reset leaves the pin floating,
+and on AVR reset every pin tri-states. The durable fix is hardware — a **pull-down on each
+solenoid driver input** so a floating/tri-stated line reads OFF (valve closed) — plus a watchdog
+so a hung loop resets rather than latching. This is a bench/hardware task for whenever Adam picks
+up pilot supervision; a software pin-rewrite and a bridge filter both *reduce* exposure but
+neither is a substitute for the pull-down. Recorded on the pilot-flame task as the hardware floor.
+
+Neither finding is closed; both are filed for Adam's direction. Hardware untouched this session.
