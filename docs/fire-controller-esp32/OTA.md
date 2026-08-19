@@ -77,6 +77,19 @@ The decision lives in `fc_ota_guard.cpp` — a dependency-free translation unit,
 separate from the ESP32-only HTTP handler, so a native unit test can exercise every branch
 including the ones that are hard to stage on hardware.
 
+**"The last switch read succeeded" is only as good as the flag that carries it.**
+`fc_switches_read_ok()` is the single source of truth for switch-read health, and
+`sensor_switches()` **clears it on entry** and sets it only after a read completes. That ordering
+is the whole property: a flag merely set at the end of a successful read stays TRUE for the entire
+duration of a failed one, so a guard reading it during a fault would be told "healthy" while the
+fail-safe simultaneously reported every switch open — a permit, in exactly the fault the flag
+exists to catch. The same failure path clears `switch_raw[]` too, so a refusal reason can never
+quote switch values that came from a read nobody completed.
+
+Anything that later wants to know whether the switches are readable — `/status`, a display, a
+future interlock — must read that accessor rather than keep its own flag or infer health from the
+switch values. The values cannot carry it: a failed read looks exactly like an idle panel.
+
 ### 3. Outputs are driven safe by core 1, and confirmed, before flashing
 
 `HMTL_Fire_Control_API.h` states that the server task *never touches ignition state*, and OTA does
@@ -136,6 +149,9 @@ unset password **fails the build**, mirroring the `FC_WIFI_AP_*` `static_assert`
 error: #error "FC_OTA_ENABLE requires FC_OTA_PASS. Build with -DFC_OTA_PASS='"<password>"' ...
 ```
 
+(The `#error` is in `HMTL_Fire_Control_API.cpp`; `fc_ota_guard.h` holds the guard, not the
+credential check. See "Building and uploading" below for the form that actually passes it in.)
+
 It is a **separate credential** from the AP/API password, authenticated as HTTP Basic user `ota`.
 The AP password is handed to anyone who needs to read `/status`, and reading status must not
 confer the ability to replace the firmware.
@@ -146,15 +162,38 @@ OTA is opt-in per environment. The base `touchcontroller_esp32` / `touchcontroll
 envs stay **serial-only on purpose**: serial is the recovery path, and it has to keep working on
 an image whose OTA endpoint is broken.
 
+The password has to reach the **compiler**, as a `-D`. A bare `FC_OTA_PASS=...` environment
+variable does not do that and the build will stop at the `#error` — that name is read only by
+`tools/upload_ota.py`, at upload time. Two forms work:
+
 ```bash
 cd HMTL_Fire_Control/platformio/HMTL_Fire_Control_Wickerman
 
-# Build an OTA-capable image (password is mandatory)
-FC_OTA_PASS='<password>' pio run -e touchcontroller_esp32_ota
+# Build an OTA-capable image (password is mandatory).
+# The inner escaped quotes are what make the value a C string literal -- the same
+# form wifi_credentials.h.example uses for FC_WIFI_AP_PASS.
+PLATFORMIO_BUILD_FLAGS='-DFC_OTA_PASS=\"<password>\"' pio run -e touchcontroller_esp32_ota
 
-# Upload it over HTTP
-FC_OTA_IP=192.168.1.59 FC_OTA_PASS='<password>' \
+# Upload it over HTTP.  This REBUILDS, so it needs both: the -D for the compiler
+# and FC_OTA_PASS in the environment for the upload script, and they must match --
+# the device authenticates against the password compiled into the image it is
+# running, so a mismatch is a 401.
+PLATFORMIO_BUILD_FLAGS='-DFC_OTA_PASS=\"<password>\"' \
+  FC_OTA_IP=192.168.1.59 FC_OTA_PASS='<password>' \
   pio run -e touchcontroller_esp32_ota -t upload
+```
+
+Or put it in the untracked `wifi_credentials.h` next to the WiFi credentials, which needs no build
+flags at all and is the easier option if you build often:
+
+```c
+#define FC_OTA_PASS "<password>"
+```
+
+To confirm the password actually reached the image rather than a header you forgot to save:
+
+```bash
+strings .pio/build/touchcontroller_esp32_ota/firmware.bin | grep '<password>'
 ```
 
 `tools/upload_ota.py` POSTs the image with `curl` (not Python's `urllib`, which Sequoia's
@@ -187,12 +226,12 @@ Both OTA slots are 1280K and the image uses under half of one, so OTA needed no 
 |---|---|---|---|
 | `touchcontroller_esp32` at `5fb430f` (before this work) | 621,793 B | 47.4% | — |
 | `touchcontroller_esp32_bench` at `5fb430f` | 628,533 B | 48.0% | — |
-| `touchcontroller_esp32` (OTA not compiled in) | 622,197 B | 47.5% | +404 B |
-| `touchcontroller_esp32_bench` (OTA not compiled in) | 628,945 B | 48.0% | +412 B |
-| `touchcontroller_esp32_ota` | 632,185 B | 48.2% | +10,392 B |
-| `touchcontroller_esp32_bench_ota` | 639,097 B | 48.8% | +10,564 B |
+| `touchcontroller_esp32` (OTA not compiled in) | 622,373 B | 47.5% | +580 B |
+| `touchcontroller_esp32_bench` (OTA not compiled in) | 629,133 B | 48.0% | +600 B |
+| `touchcontroller_esp32_ota` | 632,401 B | 48.2% | +10,608 B |
+| `touchcontroller_esp32_bench_ota` | 639,309 B | 48.8% | +10,776 B |
 
-OTA costs about 10 KB. The largest image leaves **671,623 B (51.2%) of the slot free**, so the
+OTA costs about 10 KB. The largest image leaves **671,411 B (51.2%) of the slot free**, so the
 1280K partitioning needs no change.
 
 ⚠ The **AVR** builds have no such room. They carry no OTA and no WiFi, but they do compile the
@@ -200,12 +239,20 @@ shared sensor code, so a change there can push them over:
 
 | Build | Flash | Use | vs `5fb430f` | Free |
 |---|---|---|---|---|
-| `touchcontroller` | 30,348 B | 98.8% | +42 B | 372 B |
-| `firecontroller` | 30,318 B | 98.7% | +36 B | 402 B |
+| `touchcontroller` | 30,380 B | 98.9% | +74 B | 340 B |
+| `firecontroller` | 30,360 B | 98.8% | +78 B | 360 B |
 
 Deduplicating the poofer-disable sequences is what kept this from being worse — the shared safe
 drives replaced two hand-maintained copies. Treat the AVR envs as effectively full: anything added
 to `Fire_Control_Sensors.cpp` from here needs a size check before it is assumed to fit.
+
+The last 32–42 B of that is the switch-bank read-failure branch in `sensor_switches()`. AVR reads
+switches straight off GPIO and cannot hit that branch, but the compiler does not prove it, so the
+code is there. It was kept **unconditional rather than `#ifdef`-ed out on the paths that cannot
+fail**, deliberately: the failure handling and the `switches_read_ok = false` on entry are the one
+thing standing between an unreadable switch bank and a permitted firmware upload, and a version of
+them that only exists on some builds is how that protection gets lost at a merge. Forty bytes is
+the right price for one implementation.
 
 ## Recovery
 
