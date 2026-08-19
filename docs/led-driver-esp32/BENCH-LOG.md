@@ -30,5 +30,12 @@ Currently configured 200 px, 8 A brightness limit, rainbow-cycle as boot preset 
 of a reflashed board, or push runtime cfg); `DEFAULT_MODE` compile override did not survive
 first-boot segment creation (boot preset used instead — unexplained, low priority).
 
-**Next:** second board build · 800-px strand + Cat6A run · 2 MHz clock validation with live FPS ·
-addresses 96+ for this family (71/72 trigger boards, 129 fire controller).
+**Also validated (session close):** blink PROGRAMs to module 71 outputs 0-3 at four rates via
+the bridge; program-cancel + value-off cleanup. One frame of a 4-frame burst (150 ms spacing)
+was silently lost and succeeded on retry — one-shot UDP has no delivery guarantee; scripts
+should verify or retry (motivates the filed REST-endpoint task). 91 Ω series resistors
+installed. **Prototype complete 2026-08-19** — board 1 is a working WLED+RS485 LED controller.
+
+**Next:** second board build · 800-px strand + Cat6A run (on order) · 2 MHz clock validation
+with live FPS · filed tasks: HMTL Command Server vs ESP32 (HMTL_Ecosystem), REST HMTL endpoint
+(WLED_dev, P4) · addresses 96+ for this family (71/72 trigger boards, 129 fire controller).
