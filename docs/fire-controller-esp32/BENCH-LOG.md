@@ -551,3 +551,21 @@ up pilot supervision; a software pin-rewrite and a bridge filter both *reduce* e
 neither is a substitute for the pull-down. Recorded on the pilot-flame task as the hardware floor.
 
 Neither finding is closed; both are filed for Adam's direction. Hardware untouched this session.
+
+**Session 10 addendum — de-scope splits the bridge finding (Adam: trusted senders only).**
+Adam de-scoped security: assume only intended users put frames on the bus; no auth, no
+allow-list, no attacker in the model for now. That cleanly separates the two things the bridge
+finding had conflated:
+- SECURITY half (UDP auth, address allow-list) — DEFERRED. WLED_dev task stays filed but sits;
+  revisit only if the model changes (public network, shared venue, untrusted operators).
+- SAFETY half — SURVIVES untouched: output=0xFE (ALL_OUTPUTS) fan-out reaches ungated actuator
+  classes and is reachable by ENTIRELY LEGITIMATE traffic (HMTL_Module_API.cpp:88 already builds
+  such a message; a routine "all outputs off" hits it). Zero adversaries required. Primary fix is
+  module-side (exclude PILOT/IGNITER/POOF from fan-out — in the pilot-flame plan); the bridge's
+  share is to not transparently relay an actuator-class ALL_OUTPUTS frame, kept consistent with it.
+Related CRC point (peer's, module-side but same "not security" logic): the HMTL CRC is written
+but never verified on receive, and here that's a PHYSICS problem not a malice one — the spark
+igniter fires on the same board as the RS485 transceiver, so ignition-time bit errors are the
+EXPECTED case; a corrupted frame decoding as override-enable is a noise hazard. The
+magic-plus-complement override payload requirement stays for that reason. Pull-down/watchdog
+floor unchanged and still with Adam.
