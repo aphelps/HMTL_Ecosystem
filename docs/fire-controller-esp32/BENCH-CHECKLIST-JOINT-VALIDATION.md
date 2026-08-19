@@ -76,9 +76,12 @@ requests safe-state from core 1 and blocks on the ack; ack timeout aborts (retry
       directions) passes.
 
 ### 5e. Snapshot freshness (host-verified; bench spot-check only)
-- [ ] [C] Fail-closed staleness is covered by native tests (3 of 4 verified to FAIL pre-fix).
-      Bench spot-check: across two /status polls ≥2s apart, `uptime_ms` advances — the implicit
-      liveness signal soak tooling relies on (frozen core 1 ⇒ uptime_ms stops advancing).
+- [ ] [C] Fail-closed staleness is covered by native tests (3 of 4 verified to FAIL pre-fix) —
+      those are the DEFINITIVE freshness test. Bench spot-check only: across two /status polls
+      ≥2s apart, `uptime_ms` advances. Caveat on this one's shape — uptime_ms is a firmware-produced
+      value, so the check corroborates rather than proves: it would pass vacuously if uptime were
+      ever incremented off the core whose liveness it's meant to signal. It's a cheap sanity signal
+      for soak tooling (frozen core 1 ⇒ uptime stops), NOT a substitute for the host-side test.
 
 ## 6. Stored-network path (the useStored no-op finding)
 - [ ] [C] From the AP or LAN: authenticated `/network` join to Acropolis; power-cycle; confirm
@@ -104,13 +107,19 @@ requests safe-state from core 1 and blocks on the ack; ack timeout aborts (retry
       automatically, no operator action needed.
 
 ## 9. Failed-ignition terminal state (when pilot supervision lands; SAFETY)
-- [ ] [C] Drive a simulated 3-attempt ignition FAILURE (surrogate output — LED/bench load, NEVER
-      live gas + HSI). Observe: after retries exhaust, is the pilot valve still COMMANDED OPEN?
-- [ ] [C] Confirm the design's terminal state does not leave gas commanded toward a still-hot
-      igniter — i.e. the failed-sequence resting state is gas-OFF, not gas-flowing-with-module-idle.
+Assert on the MEASURED drive line, not the firmware's command variable — the property is "is the
+valve-drive output physically de-energised", not "did the code set its command flag to closed".
+(Reading back the commanded state would be a vacuous test: it asserts what the code controls, not
+the effect it must produce. See the pattern named 2026-08-19 across three PR vacuous tests.)
+- [ ] [A] Drive a simulated 3-attempt ignition FAILURE (surrogate output — LED/bench load, NEVER
+      live gas + HSI). METER or scope the physical valve-drive line (or eyes-on the surrogate LED):
+      after retries exhaust, is the drive output actually LOW / de-energised?
+- [ ] [C] Cross-check the commanded state agrees with the measured line — a DISAGREEMENT (command
+      says closed, line still driven, or vice-versa) is itself a finding. The measured line is the
+      pass/fail; the command read-back only corroborates.
 - [ ] Note (HSI physics): the igniter stays ignition-capable for tens of seconds after
       de-energising, so "retries stopped" is NOT "ignition impossible". Terminal state must be
-      safe on its own, not rely on the igniter being off.
+      safe on its own — measured drive de-energised — not rely on the igniter being off.
 
 ## 10. Connect-does-not-reset (PR#14 HMTLCommandServer, ESP32-over-USB)
 
