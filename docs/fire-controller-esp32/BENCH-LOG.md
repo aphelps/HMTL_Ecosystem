@@ -493,3 +493,29 @@ Fix direction recorded on the task: read-health tracking in `sensor_cap()`; on s
 failure treat all pads as **released and actively send the cancels** (a local state drop is
 not enough — the blink is latched remotely); consume the `fc_switches_read_ok()`-style single
 health flag rather than inventing another.
+
+**Session 9 addendum — field symptom raises instance 4 above the theoretical.** Adam reports
+having occasionally observed *sequenced poofing getting stuck*. That is **consistent with, not
+confirmation of**, the stale-touch latch — other candidates produce the same symptom (SEQUENCE
+program state, the HMTL_NO_OUTPUT tracker, RS485 frame loss dropping a cancel). Recorded as a
+correlation to test, not a closed diagnosis; closing on the assumption the symptom is fully
+explained would risk leaving a second cause live.
+
+Four falsifiable predictions (written into the P1 task by the todo-handler session) to check
+against the next occurrence:
+(a) the stuck output follows a **touch**, not an idle period;
+(b) it does **not self-recover** — only disarm (enable-switch cascade) or power cycle stops it;
+(c) the **touch panel is unresponsive afterwards** until reset (`triggered` cleared before the
+    failed read + chip holds IRQ asserted ⇒ edge-IRQ driver wedge);
+(d) a **single output latched on**, not the sequence advancing wrongly.
+(b)+(c) together are near-diagnostic; (c) alone — dead touch panel after the stuck poof,
+recovering only on reset — is essentially this bug and nothing else. Sequence still advancing,
+or self-clearing ⇒ cause is elsewhere, keep looking.
+
+Capture review (this session): **no touch-event lines exist in any bench capture** (overnight,
+day, evening-churn) — current builds don't emit touch state at their debug level. So existing
+logs can neither support nor refute (c), and a future field occurrence won't be diagnosable
+from logs either. Instrumentation gap noted on the P1 task: enable touch logging (or a
+periodic touch-state sample line) in the next FC bench build so the predictions become
+answerable from captures. Joint-session MPR121 test gains an explicit observation step:
+**after the induced isolated fault, is the touch panel still responsive?** (prediction (c)).
