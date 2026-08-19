@@ -40,11 +40,19 @@ chip spec. Ballpark frame-serialization times:
 | 1 × 800       | 19,200 | ~19 ms (≈52 Hz)          | ~38 ms (≈26 Hz) |
 | 2 × 400       | 19,200 total | ~19 ms (≈52 Hz)    | ~38 ms (≈26 Hz) |
 
-**Honest caveat:** WLED pushes buses sequentially, so 2×400 does *not* halve total frame time
-vs 1×800. What the split buys: each electrical run is half as long, so each bus usually
-*sustains a higher clock* (often the difference between 500 kHz and 1–2 MHz stable), plus
-independent failure domains and a saner power-injection layout. Start at 1 MHz per bus and back
-off if the far end sparkles.
+**Driver asymmetry (from WLED's `bus_wrapper.h`):** on ESP32 only the **first** 2-pin bus gets
+the hardware SPI driver (`_2PchannelsAssigned == 0 → isHSPI`); a second clocked bus is
+**bit-banged**, and the source comment singles out WS2801 as "prone to flickering if bit-banged
+too slow" (500 µs latch timeout). Hardware SPI routes through the GPIO matrix to ANY pins with
+no penalty below 40 MHz, so the chosen pins already are "native SPI" in every way that matters —
+the IOMUX pin sets themselves are unavailable here anyway (VSPI natives = 5/18/19/23, our RS485
+map + bus-1 clock; HSPI natives = 12/13/14/15, wired to the LoRa radio).
+
+**Recommendation:** wire all four shifter channels (costs nothing), but default to **one
+800-px chain on bus 1** — everything on hardware SPI + DMA. Treat the 2×400 split as a bench
+experiment: keep it only if the bit-banged bus 2 shows no flicker under real load. WLED pushes
+buses sequentially, so the split does not halve frame time anyway; its benefits are shorter
+electrical runs (higher stable clock), independent failure domains, and injection layout.
 
 ## 3. Power — the LEDs dominate everything
 
