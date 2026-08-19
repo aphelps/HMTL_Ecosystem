@@ -43,3 +43,12 @@ drives/observes from the Mac.
 ## 6. Stored-network path (the useStored no-op finding)
 - [ ] [C] From the AP or LAN: authenticated `/network` join to Acropolis; power-cycle; confirm
       the controller rejoins from SDK-stored credentials with NO compiled-in credentials present.
+
+## 7. Pilot-broadcast staleness (when the FC-half of pilot supervision lands)
+- [ ] [C] With a module broadcasting proven-flame and poofs permitted, **[A] pull that module's
+      power mid-run** (or [C] disconnect its bus leg).
+- [ ] [C] Confirm the controller refuses poof commands after the staleness bound expires —
+      silence must read as UNPROVEN, never as the last good report continuing. Record the
+      elapsed time between the last heard broadcast and the first refused poof.
+- [ ] [C] Restore the module; confirm poofing re-permits only after fresh proven-flame
+      broadcasts arrive (not merely on the module reappearing).
