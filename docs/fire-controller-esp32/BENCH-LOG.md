@@ -409,3 +409,21 @@ sequence and wait out the boots before sending.
 Parent on `main` (gitlink for HMTL_Fire_Control intentionally ahead at the merged main until
 #6 lands); HMTL and HMTL_Fire_Control worktrees on their merged mains; EspLibraries on
 `master`. All feature branches pushed; nothing uncommitted anywhere.
+
+---
+
+# Session 7 — 2026-08-19: MCP23017 switches integrated; full ignition chain validated
+
+The switch inputs moved off the placeholder GPIOs onto the MCP23017 expander (0x26, A0
+jumpered after an i2c-scan caught the factory 0x27), read via a register-level Wire driver on
+branch `mcp23017-switch-inputs` with the doc's fail-safe semantics: any bus failure reads all
+switches OPEN and freezes the seen-open qualification. LEDs wired and validated (a
+shifter-VCC-to-ground miswire was the one hardware fault found). Bus leg re-wired; after an
+unplugged-connector detour, address 129 is discoverable by Scan from board 72 — the ESP32
+answers bus polls both directions.
+
+**Milestone: full ignition chain live on the bench** — physical switch closes (via PA0-PA3)
+arm the controller, MPR121 touch sensors fire the poofer outputs on trigger board 71/72 over
+RS485. Switches → I2C → interlock → arming → touch → RS485 → trigger outputs, all real
+hardware. (Optocoupler input stage and real rocker switches still to come per WIRING.md §7;
+driver native tests owed before the branch PRs.)
