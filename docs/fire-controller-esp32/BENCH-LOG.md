@@ -451,3 +451,45 @@ boot-time safe-drive fix addresses (riding its OTA branch).
 
 **MCP driver branch complete:** native tests added (scriptable Wire mock; fail-safe contract
 pinned; 34/34), rebased onto merged main, pushed — ready for PR flow.
+
+---
+
+## Session 9 — 2026-08-19 (daytime, off-bench): I2C fault-pattern audit
+
+No hardware touched. Triggered by the todo-handler session's OTA self-review, which found a
+permit-on-fault bug (stale `switches_read_ok` surviving a failed MCP23017 read — its fix, not
+a defect in the switch driver's fail-safe contract). Auditing for the same shape turned up
+**four instances in one day of the identical bug pattern**: a consumer that cannot distinguish
+*"I know this is fine"* from *"I have no idea"*.
+
+| # | Where | Consumer blind to | Status |
+|---|---|---|---|
+| 1 | OTA guard reading `switches_read_ok` | flag stale-true across failed read | fix in progress (clear-on-entry, `fc_switches_read_ok()` accessor = single source of truth) |
+| 2 | `/status` endpoint switch fields | "all open" vs "I2C bus dead" | noted on `mcp23017-switch-inputs` tracking task — expose error count + health flag when dispatched |
+| 3 | Pilot-flame design: absent broadcasts | "pilot proven" vs "no data" | already handled in task design (absent ⇒ unproven, not all-clear) |
+| 4 | **MPR121 touch path** (`readTouchInputs`) | failed read vs no-change; `touchStates` frozen at last good value | **P1 task filed — live defect on the fire path** |
+
+**Instance 4 is the serious one — it triggers rather than gates.** `MPR121::readTouchInputs()`
+returns the same `false` for "no change" and "I2C read failed" (`Wire.available()<2`), keeping
+`touchStates` at its pre-failure value; `triggered` is cleared *before* the failed read and the
+chip holds IRQ asserted until a successful status read, so with edge IRQs one failed read can
+wedge the driver stale permanently. `checkPulse()` starts poofs as repeat-forever blink
+programs (`sendHMTLBlink(..., 0xFFFFFFFF, ...)`) running autonomously on the *remote* module,
+cancelled only on the falling touch edge — so an MPR121 fault mid-touch means the cancel is
+never sent and the poofer pulses until the operator disarms. Independently source-verified by
+the todo-handler session before it raised the task P2→P1 and pinged Adam.
+
+**Defense-in-depth boundary (verified):** a *whole-bus* fault also fails the MCP23017 read →
+switch fail-safe forces all switches open → enable-switch cascade `sendCancelAndOff`s every
+poof output. Covered. Exposure is specifically an **MPR121-isolated fault** (its SDA stub,
+brownout, latch-up) — switches stay armed, stale-touch latch holds.
+
+Bench methods, for the joint session: SDA-to-ground at the expander faults the *whole bus*
+(right for the OTA-refusal test — MCP fail-safe disarms in parallel); isolated-MPR121 faulting
+needs the MPR121's own SDA stub lifted. Three-part MPR121 test queued in the tracking task:
+demonstrate on current fw / verify enable-switch cancel / verify auto-cancel on fixed fw.
+
+Fix direction recorded on the task: read-health tracking in `sensor_cap()`; on sustained
+failure treat all pads as **released and actively send the cancels** (a local state drop is
+not enough — the blink is latched remotely); consume the `fc_switches_read_ok()`-style single
+health flag rather than inventing another.
