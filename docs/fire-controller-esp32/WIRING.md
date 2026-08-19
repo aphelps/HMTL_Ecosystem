@@ -326,9 +326,22 @@ documents. At minimum the following must be decided before anything is connected
    RS485, not by this controller directly. If the controller browns out, hangs, or the bus dies
    mid-sequence, **do 71/72 time out and close?** Unverified. The usual answer is a heartbeat with
    an actuator-side timeout; without one, a hung master leaves valves as last commanded.
-3. **WiFi/AP exposure.** [OTA.md](OTA.md) adds `WiFiBase`, which includes AP fallback and a config
-   portal. An open AP with a config portal on an ignition controller is real exposure — arming
-   should be blocked while the portal is up, and AP fallback probably disabled on this build.
+3. **WiFi/AP exposure.** The WiFi build runs its web server in a FreeRTOS task pinned to core 0
+   — the flame path in `loop()` (core 1) never services HTTP, so a stalled or adversarial client
+   can wedge the *API* but not flame-off. The server task only reads a status snapshot published
+   by `loop()`; nothing HTTP-reachable writes ignition state. AP fallback is **enabled by
+   decision** (2026-08-18): with no known network the controller raises a **WPA2
+   password-protected** AP (never open — a sub-8-char password is refused rather than falling
+   open, and with no flashed password a stable per-device one is derived and printed on serial).
+   The AP's name and initial password can both be fixed at build time
+   (`-DFC_WIFI_AP_SSID`/`-DFC_WIFI_AP_PASS`, API.md §3), which is how a deployed board gets
+   credentials the crew knows in advance without a serial capture in the field.
+   Endpoints that change WiFi state or list stored networks (`/network`, `/scan`, `/known`)
+   require HTTP Basic auth with that password; the WiFiManager captive portal is not used.
+   Residual exposure to accept knowingly: whoever holds the AP password can repoint the
+   controller's WiFi (not ignition), and an adversarial client can deny the status API.
+   Operator-facing usage — endpoints, auth, `curl` examples, the join flow — is in
+   [API.md](API.md).
 
 The rules below are necessary, not sufficient.
 
