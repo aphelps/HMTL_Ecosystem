@@ -427,3 +427,27 @@ arm the controller, MPR121 touch sensors fire the poofer outputs on trigger boar
 RS485. Switches → I2C → interlock → arming → touch → RS485 → trigger outputs, all real
 hardware. (Optocoupler input stage and real rocker switches still to come per WIRING.md §7;
 driver native tests owed before the branch PRs.)
+
+---
+
+# Session 8 — 2026-08-19 (day): overnight soak results; reboot-mid-burst hazard demonstrated
+
+**Overnight soak (129 + 96 + 72):** fire controller ran 7.6+ h continuous on the merged WiFi +
+MCP23017 build, zero unexpected resets, RSSI −43…−46. WiFi task closed out per Adam
+(/ack-tested on FC#4 with per-item evidence/waiver annotations; physically-gated items carried
+into a new bench-validation task by the todo-handler session). LED board's 03:17 outage was a
+human power cut; rejoined instantly on restore.
+
+**Framing-error timeline (72's counters):** all 146 accumulated errors trace to the previous
+evening's churn window (floating-electrode phantom-touch stream while 71 was on the bus, plus
+mid-soak reflashes); the overnight bus was pristine — flat for 8.3 h. An FC hard reboot costs
+exactly +1 framing error at receivers (boot-ROM line chatter on the RS485 pins) — benign.
+
+**Reboot-mid-burst hazard (empirical, LEDs only):** 30 s TIMED_CHANGE burst to 72 → FC
+hard-rebooted at T+5 → FC boots back SILENT (no cancel/off ever sent) → only the actuator-side
+30 s timer ends the burn. Plain VALUE outputs have no self-expiry at all, so a reboot after a
+non-timed ON latches the output indefinitely. Confirms the hazard the todo-handler session's
+boot-time safe-drive fix addresses (riding its OTA branch).
+
+**MCP driver branch complete:** native tests added (scriptable Wire mock; fail-safe contract
+pinned; 34/34), rebased onto merged main, pushed — ready for PR flow.
