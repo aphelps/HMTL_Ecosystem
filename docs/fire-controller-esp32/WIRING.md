@@ -234,9 +234,27 @@ exactly the boards it is meant to disambiguate.
 
 ---
 
-## 6. I2C — MPR121 + MCP23017
+## 6. I2C — MPR121 + MCP23017 + LCD backpack
 
-Both share GPIO 21/22. Different connectors, so they wire differently.
+All three share GPIO 21/22. Addresses are distinct by construction: MPR121 `0x5A`, MCP23017
+`0x26` (A0 jumpered for exactly this), LCD backpack `0x27`.
+
+Three bus rules with all three attached:
+
+- **Bus speed stays at 100 kHz.** The PCF8574 LCD backpack maxes out there; the others are
+  faster but the bus runs at the slowest device. The ESP32 default is already 100 kHz.
+- ⚠ **The LCD backpack is the one 5V device on the bus.** Its onboard pull-ups go to ITS VCC —
+  at 5V they would lift SDA/SCL above what the ESP32 (not 5V-tolerant) and the MPR121
+  (abs-max ~3.6V — it dies first) survive. Preferred: a small BSS138-type bidirectional I2C
+  level shifter on the LCD's leg only (LV side = bus at 3.3V, HV side = backpack at 5V).
+  Acceptable-but-verify: remove the backpack's pull-up pair and let the 3.3V pull-ups win —
+  the PCF8574's nominal input threshold at 5V VCC is 3.5V, so a 3.3V high is out of spec on
+  paper even though it commonly works; bench-verify before trusting it.
+- **Audit stacked pull-ups** once everything is attached: each breakout carries its own pair,
+  and three pairs in parallel can get stiff. Aim for ~2–10 kΩ effective to 3.3V; remove pairs
+  (prefer keeping the ones nearest the middle of the bus wiring) if the total drops below ~2 kΩ.
+
+MPR121 and MCP23017 wire differently (different connectors):
 
 ```
    ESP32 Qwiic ═══════════► MPR121 STEMMA QT     (one cable: 3V3, GND, SDA, SCL)
@@ -262,14 +280,33 @@ Both share GPIO 21/22. Different connectors, so they wire differently.
 
 ---
 
-## 7. Ignition switches on the MCP23017
+## 7. Ignition switches — 12V loop → PS2501-4 optocoupler → MCP23017
+
+The box's rocker switches are 12V-powered (built-in indicator LEDs), and the previous-generation
+controller isolated them behind a **PS2501-4** quad optocoupler. That part carries over — the
+isolation keeps the 12V loop (which shares a supply with solenoid hardware and its transients)
+galvanically separated from the logic. Input side is unchanged from the old build; only the
+output side's destination changes (MCP23017 inputs instead of AVR GPIOs).
 
 ```
-   MCP23017 GPA0 ──┬── switch 1 ── GND
-   MCP23017 GPA1 ──┼── switch 2 ── GND      internal pull-up enabled per pin
-   MCP23017 GPA2 ──┼── switch 3 ── GND      (no external resistors)
-   MCP23017 GPA3 ──┴── switch 4 ── GND
+   12V ── switch 1 ── R series ── PS2501 pin 1 (anode 1)     input side: ~5-10 mA
+                                  PS2501 pin 2 (cathode 1) ── 12V-loop return
+   (channels 2-4 identical on pins 3/4, 5/6, 7/8)
+
+   PS2501 pin 16 (collector 1) ──► MCP23017 GPA0      output side, per channel:
+   PS2501 pin 15 (emitter 1)   ──► logic GND          collector → GPAn (internal 100k
+   (channels 2-4: 14/13, 12/11, 10/9)                 pull-up enabled), emitter → GND
 ```
+
+- **Active-low, same as before:** switch closed → opto conducts → GPAn pulled low. This matches
+  the firmware's seen-open interlock convention; no logic inversion anywhere.
+- **Series resistors:** reuse the old assembly's if they come with the harness; otherwise
+  ~1.5–2.2 kΩ for 5–10 mA through the opto LED at 12V.
+- The 12V-loop side and the logic side share **no** wiring except inside the opto. That is the
+  point — do not "simplify" by commoning their grounds at the switch panel.
+- MCP23017 internal pull-ups (~100 kΩ) are sufficient here — the opto only has to sink ~33 µA,
+  and the noise argument for stiffer external pull-ups is weakened by the isolation. If a channel
+  looks slow or noisy on the bench, 10 kΩ external pull-ups are the fallback.
 
 **Interrupts:** `INTA`/`INTB` are broken out but there is no free GPIO. Either poll on a timer
 (fine at human timescales), or set `INT` open-drain (`IOCON.ODR`) and **wire-OR it onto GPIO 4**
@@ -361,7 +398,25 @@ ESP32 needs `digitalPinToInterrupt()`).
 
 ---
 
-## 10. Pre-power checklist
+## 10. Switch-chain integration tests (run when the optos + MCP23017 go in)
+
+Unpowered (continuity):
+- [ ] Per channel: 12V switch feed → series R → opto anode; opto cathode → 12V-loop return.
+- [ ] Per channel: opto collector → its GPAn pin; all four emitters → logic GND.
+- [ ] **No** continuity between the 12V-loop return and logic GND (the isolation is the test).
+
+Powered, before firmware trusts it:
+- [ ] I2C scan shows exactly `0x26` (MCP23017), `0x27` (LCD, if attached), `0x5A` (MPR121).
+- [ ] SDA/SCL idle HIGH at **3.3V** (not 5V!) with all devices attached — catches the LCD
+      pull-up hazard from §6. Measure before connecting the ESP32 if the LCD is new to the bus.
+- [ ] Per channel: switch open → GPAn reads high (≥3.0V at the pin); switch closed → GPAn
+      **< 0.4V** (also screens an aged opto's CTR; a channel sagging near 1V is a tired part).
+- [ ] Firmware pass: with the interlock reset, each switch must read open ≥1s before a close
+      registers (`SWITCH_OPEN_LATCH_MS` qualification — same behavior as the native tests).
+- [ ] Wiggle test per channel at the switch panel: no cross-channel chatter on the other GPAn
+      bits (screens harness crosstalk into the 12V loop).
+
+## 11. Pre-power checklist
 
 - [ ] USB **not** connected if the 3V3 feed is live
 - [ ] LM1117: 10µF on input *and* output; tab (VOUT) isolated; star-fed from the supply
