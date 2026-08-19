@@ -569,3 +569,22 @@ igniter fires on the same board as the RS485 transceiver, so ignition-time bit e
 EXPECTED case; a corrupted frame decoding as override-enable is a noise hazard. The
 magic-plus-complement override payload requirement stays for that reason. Pull-down/watchdog
 floor unchanged and still with Adam.
+
+---
+
+## Session 11 — 2026-08-19 (autonomous soak watch): module 129 poll-timeout trend
+
+Soak observation, no action taken (hardware reserved; 129 is telemetry, not an actuator path).
+Module **129 is flapping on polls** and the rate is trending UP:
+  03:00–08:00  ~15–28% timeout   |   10:00  50% (6/12)   |   11:00 30% (19/63)   |   12:00 30% (8/27)
+**Discriminator (the useful part):** module 72 is polled the IDENTICAL way (UDP → bridge master
+→ RS485 bus) and is 100% OK across the same window; 96/WLED and the FC are healthy throughout.
+So this is NOT the shared WiFi/bridge leg and NOT generic UDP frame loss (those would hit 72's
+polls too) — it localizes to **129's own bus segment or the module itself**. The bridge master
+poll is single-shot with a 3s timeout and NO retry (soak2.py:16-24), so each FAIL is one lost
+round-trip; a per-module ~30% loss on one node while its bus-mate is clean points at 129's leg
+(marginal termination/connector) or 129 firmware, not the network.
+For Adam at the bench: worth reseating 129's bus connector / checking its termination first —
+cheapest thing that fits the signature. Not urgent (no actuator or safety path affected). Will
+push a notification only if 129 goes fully offline (as 96 did on the overnight power cut) or the
+loss rate stays sustained >60%.
