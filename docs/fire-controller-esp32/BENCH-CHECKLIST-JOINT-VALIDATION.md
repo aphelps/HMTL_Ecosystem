@@ -144,3 +144,17 @@ Run cheapest-first: the banner check may make the scope trip unnecessary.
       a captured POWERON_RESET mild positive evidence; that was wrong.]
 - [ ] [C] AVR DTR-cap reset is NOT software-suppressible — for AVR modules, connect WILL reset;
       plan captures around that (hold the port open across the whole sequence).
+
+## 11. Frame-truncation resync (PR#14 d27b320 — PROVISIONAL, pending re-review confirmation)
+Status: the fix (truncated frame at a read boundary → reader resynchronises past it instead of
+dying or silently dropping the body) was INFERRED from the diff by the peer session (no skip
+markers + a resync test present), NOT yet re-reviewed. Treat this item as provisional; the peer
+will confirm or report the fix is narrower than it looks. Do not run/rely on it as settled until then.
+- [ ] [C] Send a BODY-BEARING frame (NOT a poll — a poll is exactly 8 bytes and straddles nothing,
+      which is how the original guard was vacuous) engineered to straddle a serial read boundary
+      into 72's bridge path.
+- [ ] [A] Pass/fail is the FAR END's physical response — the target output actually changing (eyes
+      on LED / metered drive line). NOT the sender reporting success, and NOT the receiver's own
+      parse-log line: the bug produced a header-only item + stray text that a receiver log would
+      happily describe as "a message arrived", so a log-reading test passes on the broken code.
+- [ ] Pairs with the §5d/§10 wire instrumentation on 72 — same setup, no new rig.
