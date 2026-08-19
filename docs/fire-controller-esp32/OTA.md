@@ -65,9 +65,10 @@ lock is on."* A known gap in their model. **We should not copy that**, see below
 
 ## Plan
 
-1. **WiFi.** Add `WiFiBase` to `[env:touchcontroller_esp32]` (it is already in HMTL_Module's
-   `esp_only_libs`). Bring it up in `setup()`, non-blocking/background so a missing AP never stalls
-   the controller.
+1. **WiFi.** Done — `HMTL_Fire_Control_API.cpp` brings `WiFiBase` up in a FreeRTOS task pinned
+   to core 0, so bring-up and HTTP never stall `loop()`. AP fallback is WPA2-password-protected
+   with runtime network configuration via the authenticated `/network` endpoint (see WIRING.md
+   §7). OTA work builds on that task.
 2. **ArduinoOTA.** `setHostname()`, `setPassword()`, `begin()` in setup; `handle()` in the main
    loop behind guards.
 3. **PlatformIO upload path — HTTP primary** (espota UDP is blocked on this laptop's macOS;
