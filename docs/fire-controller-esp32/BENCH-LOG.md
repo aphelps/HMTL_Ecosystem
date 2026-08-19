@@ -359,3 +359,53 @@ pattern: file-based capture script, explicit reset pulse, verify heartbeats befo
 | ESP32 | `touchcontroller_esp32_bench` (committed code, standard debug levels), addr 129, disarmed |
 | Verified chains | USB↔serial · EEPROM config · RS485→71/72 (polls + poofer pulses) · pixels/programs · **MPR121 touch→IRQ→app** |
 | PRs | HMTL#12, ArduinoLibs#14 (now incl. the ISR fix), HMTL_Fire_Control#3, HMTL_Ecosystem#4 — all reviewed, all findings addressed |
+
+---
+
+# Session 6 — 2026-08-18/19: submodule bump validated; fire-control dev stashed
+
+Development on the fire-control module is **paused here by request**; this entry is the resume
+record. Everything below was committed and pushed before stashing — there is no uncommitted work.
+
+## Open PRs (the stashed development)
+
+| PR | Branch | What it carries |
+|---|---|---|
+| HMTL_Fire_Control#4 | `esp32-fire-control-wifi` | WiFi + `/status` API on a core-0 pinned task; WPA2 AP fallback; authenticated runtime config (`/network`, `/appass`); native-harness fix (HMTLProtocol include, stub Socket/pinMode); `fc_is_armed()` + interlock-qualified switch tests |
+| EspLibraries#1 | `fire-control-wifi` | WiFiBase upstream: auth on `/network`/`/scan`/`/known`, null-server guards, honest background flag, WPA2 password floor, `authorizeConfigRequest()`, bug fixes |
+| HMTL#13 | `wifibase-auth-compat` | HMTL_Module opt-out (`allowUnauthenticatedConfig(true)`), copy-assign removal, stored-network sentinel |
+| HMTL_Ecosystem#5 | `fire-control-wifi-docs` | WIRING.md §7 rewritten for the second-core + authenticated-AP design; OTA.md step 1 |
+| HMTL_Ecosystem#6 | `bump-submodules-post-merge-2026-08-18` | `.gitmodules` → aphelps remotes + gitlinks to the merged mains; hardware-validated (below) |
+
+All four WiFi PRs are self-review-converged (findings fixed, threads resolved). Approved
+decisions baked into the plan/PRs: upstream WiFiBase fixes with auth (not removal),
+second-core FreeRTOS server task, password-protected AP with no-reflash configuration.
+
+## Merge order + gotchas on resume
+
+1. EspLibraries#1 first (FC#4 compiles against its `authorizeConfigRequest()`), then HMTL#13
+   (or HMTL_Module builds get 403s from the auth default), then FC#4, then the docs (#5) and
+   bump (#6). #6's FC-suite gate goes green only after FC#4 merges (the harness fix rides there).
+2. **Reflash the ESP32 after FC#4 merges** — the bench image predates the WiFi work.
+3. Bench items still owed (from the WiFi plan's Testing Required): AP join + wrong-password
+   rejection · `/status` while armed · adversarial client during pilot keepalive · reboot
+   persistence after a `/network` join · `/appass` round-trip · blink cadence during bring-up.
+4. WiFi builds print the derived AP password on serial only when no NVS/build-flag password is
+   set; credentials go in `wifi_credentials.h` (gitignored; `.example` committed).
+
+## Hardware validation performed this session (recorded mains)
+
+ESP32 (addr 129, `/dev/cu.usbserial-2110`) flashed `touchcontroller_esp32_bench` @ FC main
+8ee3ca8; trigger board 72 (`/dev/cu.usbserial-FTFO9I0N`) flashed `mini` @ HMTL main 1c4e2de.
+Serial POLL → forwarded over RS485 → 72 answered ("Poll req src:129") → response relayed back;
+two VALUE pulses handled; `rs485 framing_errors:0 rejects:0`. Board 71 not connected.
+
+Port-opening gotcha re-confirmed: opening either serial port auto-resets the board (DTR on
+open) even with setDTR(False) issued post-open — hold BOTH ports open across a whole test
+sequence and wait out the boots before sending.
+
+## Worktree state as left
+
+Parent on `main` (gitlink for HMTL_Fire_Control intentionally ahead at the merged main until
+#6 lands); HMTL and HMTL_Fire_Control worktrees on their merged mains; EspLibraries on
+`master`. All feature branches pushed; nothing uncommitted anywhere.
