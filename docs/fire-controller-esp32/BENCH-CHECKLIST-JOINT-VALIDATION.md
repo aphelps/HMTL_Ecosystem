@@ -117,7 +117,13 @@ requests safe-state from core 1 and blocks on the ack; ack timeout aborts (retry
       HUPCL-clear are ASSERTED, not demonstrated — pyserial's open() DTR-then-RTS ordering can
       still pass through an EN-low pulse. This scope trace is the ONLY thing that settles it;
       do not carry "connect doesn't reset" as an assumption.
-- [ ] [C] Cross-check: capture the ESP32 boot-cause line on the next connect. EN/DTR auto-reset
-      shows a software/EN reset cause; a clean connect shows none (no boot line at all). AVR
-      DTR-cap reset is NOT software-suppressible — for AVR modules, connect WILL reset; plan
-      captures around that (hold the port open across the whole sequence).
+- [ ] [C] Boot-line presence (NOT cause) is the only usable serial cross-check: if a connect
+      produces ANY ESP32 boot banner, a reset happened. The reset-CAUSE code CANNOT discriminate
+      here — an EN/DTR auto-reset reports `rst:0x1 (POWERON_RESET)`, the SAME code as a real power
+      cycle (the RTC can't tell "supply came up" from "EN released"; esptool resets show 0x1 too).
+      Only SW/watchdog classes (0x3 SW_RESET, 0xc SW_CPU_RESET, RTCWDT/TG*WDT) would discriminate,
+      and an EN reset produces none of them. So do NOT read an observed POWERON_RESET as evidence
+      of "no connect-reset" — it is neutral. [Correction 2026-08-19: an earlier note here called a
+      captured POWERON_RESET mild positive evidence; that was wrong — see above.]
+- [ ] [C] AVR DTR-cap reset is NOT software-suppressible — for AVR modules, connect WILL reset;
+      plan captures around that (hold the port open across the whole sequence).
