@@ -166,6 +166,7 @@ Handlers accept both `GET` and `POST`; arguments are query-string or form fields
 | `/known` | **Basic** | Lists stored SSIDs (authenticated because it discloses them) |
 | `/scan` | **Basic** | Scans for nearby networks. Blocks for seconds |
 | `/appass?pass=` | **Basic** | Set the AP/API password, ≥8 and ≤23 chars. Applies **next boot** |
+| `/update` (POST) | **Basic, user `ota`** | Firmware upload. Present only in the `*_ota` build envs, and behind the ignition guards in [OTA.md](OTA.md) |
 
 `/status` and `/appass` are this project's; the rest come from WiFiBase and are shared with
 HMTL_Module.
@@ -198,6 +199,8 @@ while one is in flight, other API requests wait. This costs nothing on the flame
 {
   "armed": false,
   "switches": [false, false, false, false],
+  "switches_raw": [false, false, false, false],
+  "switches_read_ok": true,
   "uptime_ms": 412530,
   "wifi": {"connected": true, "ssid": "MyNetwork", "ip": "10.0.0.57", "rssi": -58}
 }
@@ -210,13 +213,25 @@ while one is in flight, other API requests wait. This costs nothing on the flame
 | `switches[1]` | Pilot |
 | `switches[2]` | Enable |
 | `switches[3]` | Program mode (`PROGRAM_MODE_SWITCH` — this build's `CONTROL_SINGLE_QUINT` mode replaces the lights switch with it) |
+| `switches_raw[]` | The same four switches **before** the arming interlock — the physical reading. Differs from `switches` for a switch closed since boot |
+| `switches_read_ok` | The switch bank was actually read. `false` means the values above are not evidence of anything |
 | `uptime_ms` | `millis()` at the last publish — increments per `loop()`, so a frozen value means `loop()` stopped |
 | `wifi.*` | Read live on the server task, not from the snapshot |
 
-The switch values are the **interlock-qualified** states, not raw pin levels: a switch that has
+The `switches` values are the **interlock-qualified** states, not raw pin levels: a switch that has
 been closed since power-on reads `false` until it has been seen open for a continuous second
 (`SWITCH_OPEN_LATCH_MS`). That is intentional — see WIRING.md §7 — so a switch left on across a
 reboot shows `false` here until it is cycled, and that is correct, not a reporting bug.
+
+`switches_raw` exists because that interlock points the wrong way for anything asking *"is this
+switch physically active?"* — a stuck-closed switch reads `false` in `switches`. The OTA guard
+reads raw for exactly this reason (see [OTA.md](OTA.md)), and it is reported here so an operator
+can see what would block an upload without attempting one.
+
+`switches_read_ok` is the difference between *"nothing is active"* and *"we could not tell"*.
+The ignition path resolves an unreadable switch bank to all-open-and-do-not-arm, which is right
+for arming and is a **permit-on-fault** for anything asking whether it is safe to act. Read this
+field before believing the two arrays above.
 
 `armed`, `switches` and `uptime_ms` come from a snapshot `loop()` publishes on core 1 under a
 spinlock; a response is always one self-consistent set of values, never fields sampled mid-update.
@@ -266,5 +281,8 @@ problem.
 
 - No arm, fire, ignite, poofer-address or program endpoint, and none should be added — see
   WIRING.md §7's scope warning. Ignition writes stay on the physical switches and RS485.
-- No OTA endpoint **yet**; that is the next task ([OTA.md](OTA.md)), and it gets its own guards.
+- No OTA endpoint in the **default** envs. It is compiled in only by the `*_ota` envs, has its
+  own mandatory password separate from the AP/API one, and sits behind ignition-specific guards —
+  see [OTA.md](OTA.md). The serial envs stay OTA-free on purpose: serial is the recovery path.
+- No espota / `ArduinoOTA`, deliberately — one transport, one set of guards ([OTA.md](OTA.md)).
 - No TLS. Treat the API as bench/LAN-only and assume anyone on the network can read status.

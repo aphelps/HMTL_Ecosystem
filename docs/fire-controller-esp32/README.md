@@ -11,7 +11,7 @@ RS485, and linking to the TouchMatrix (identical hardware) over LoRa.
 | **[STARTUP.md](STARTUP.md)** | **Start here at the bench.** Pre-flight checks, the three source/build changes, staged bring-up with pass/fail criteria, reference numbers, known traps |
 | [WIRING.md](WIRING.md) | Part identification, the GPIO conflict with the TouchController PCB design, the revised pin map, wiring diagram, and the WS2801 logic-level risk |
 | **[API.md](API.md)** | **Using the WiFi/status API** — getting on a network, the AP-fallback join flow, every endpoint with auth and `curl` examples, the `/status` JSON, troubleshooting |
-| [OTA.md](OTA.md) | Why OTA is needed (USB/3V3 conflict), what exists, and the plan — HTTP `/update` primary (espota is blocked on this laptop), with ignition-specific guards |
+| [OTA.md](OTA.md) | Why OTA is needed (USB/3V3 conflict), the guarded HTTP `POST /update` path and why it is not espota, the build/upload/recovery procedures, and the flash budget |
 | [BENCH-LOG.md](BENCH-LOG.md) | **Current board state**, what was measured and concluded each session — including retracted conclusions, kept with their retractions |
 | [RS485-BRIDGE-BRINGUP.md](RS485-BRIDGE-BRINGUP.md) | RS485 bus facts (28000 baud), the WLED `rs485_bridge` usermod settings, the cached-`libdeps` build trap, and the address registry collision |
 
