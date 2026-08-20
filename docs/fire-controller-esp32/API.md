@@ -156,6 +156,7 @@ which is not acceptable on an ignition controller. The AP plus `/network` replac
 Port **80**. Response bodies are `application/json` — including `/documentation`'s doc dump — with
 two exceptions: the `404` is `text/plain` (§7) and the `401` is the WebServer's bare auth challenge.
 Handlers accept both `GET` and `POST`; arguments are query-string or form fields interchangeably.
+The one exception is `/update`, which is registered `HTTP_POST` only — see the note under the table.
 
 | Endpoint | Auth | What it does |
 |---|---|---|
@@ -166,10 +167,29 @@ Handlers accept both `GET` and `POST`; arguments are query-string or form fields
 | `/known` | **Basic** | Lists stored SSIDs (authenticated because it discloses them) |
 | `/scan` | **Basic** | Scans for nearby networks. Blocks for seconds |
 | `/appass?pass=` | **Basic** | Set the AP/API password, ≥8 and ≤23 chars. Applies **next boot** |
-| `/update` (POST) | **Basic, user `ota`** | Firmware upload. Present only in the `*_ota` build envs, and behind the ignition guards in [OTA.md](OTA.md) |
+| `/update` (**POST only**) | **Basic, user `ota`** | Firmware upload. Present only in the `*_ota` build envs, and behind the ignition guards in [OTA.md](OTA.md). `GET /update` 404s even when OTA *is* compiled in — see the note below |
 
 `/status` and `/appass` are this project's; the rest come from WiFiBase and are shared with
 HMTL_Module.
+
+**`GET /update` 404s on an OTA build — that is not evidence OTA is absent.** The route is
+registered `server->on("/update", HTTP_POST, ...)`, so a `GET` never reaches the handler and falls
+through to the WebServer's plain `404` (§7) — the same `404` a build with no OTA compiled in at
+all returns. Probing by hand with a browser or a bare `curl` therefore cannot tell the two apart.
+
+Nor can the other read-only surfaces, so do not reach for them:
+
+- **`/documentation` does not list `/update`.** It only knows about endpoints added through
+  `wfb.addRESTEndpoint()`, and `/update` is registered with `server->on()` directly, because a
+  firmware upload needs the two-handler (response + upload) form the REST helper cannot express.
+  Its absence from the dump means nothing either way.
+- **`/status` does not indicate it either.** `switches_raw[]` and `switches_read_ok` are served by
+  every build, not just `*_ota` ones. They tell you whether the guards *would* permit an upload —
+  which is the useful thing to check before attempting one — not whether the endpoint exists.
+
+The only HTTP-level test is an actual `POST /update`: an OTA build answers `401`/`409`/`200`
+(never `404`), a non-OTA build `404`s. On serial, an OTA build prints
+`API: OTA enabled at POST /update` at startup.
 
 Auth is HTTP Basic, username **`admin`**, password as in §3 — `curl -u admin:<password>`. With no
 password configured at all the authenticated endpoints answer `403

@@ -146,11 +146,16 @@ is the real argument for this change.
 unset password **fails the build**, mirroring the `FC_WIFI_AP_*` `static_assert` precedent:
 
 ```
-error: #error "FC_OTA_ENABLE requires FC_OTA_PASS. Build with -DFC_OTA_PASS='"<password>"' ...
+HMTL_Fire_Control_API.cpp:158:6: error: #error "FC_OTA_ENABLE requires FC_OTA_PASS. Build with -DFC_OTA_PASS='\"<password>\"' or define it in the untracked wifi_credentials.h. OTA on an ignition controller is never unauthenticated."
 ```
 
-(The `#error` is in `HMTL_Fire_Control_API.cpp`; `fc_ota_guard.h` holds the guard, not the
-credential check. See "Building and uploading" below for the form that actually passes it in.)
+Copied verbatim from a real failing build, backslashes included. GCC echoes an `#error` string
+exactly as the source spells it, and the source spells the flag `-DFC_OTA_PASS='\"<password>\"'`
+— those `\"` escapes are what make the value a C string literal, and dropping them is precisely
+the trap the message exists to steer you away from. Copy the flag from here, not from memory.
+
+(The `#error` lives in `HMTL_Fire_Control_API.cpp`, not `fc_ota_guard.h`, which holds the guard
+rather than the credential check. See "Building and uploading" below for the whole command.)
 
 It is a **separate credential** from the AP/API password, authenticated as HTTP Basic user `ota`.
 The AP password is handed to anyone who needs to read `/status`, and reading status must not
@@ -211,12 +216,21 @@ Responses:
 | Code | Meaning |
 |---|---|
 | `200` | image accepted; the device is rebooting into it |
+| `400` | the upload was aborted before it completed — e.g. a client that dies mid-multipart |
 | `401` | bad or missing credentials |
 | `409` | a guard refused — the body says which, and names the blocking switch |
 | `500` | the flash write failed, or the image was incomplete or invalid |
 
 `GET /status` also reports `switches_raw[]` and `switches_read_ok`, so an operator can see what
 would block an upload without having to attempt one.
+
+**`GET /update` returns `404`, even on an OTA build.** The route is registered `HTTP_POST` only, so
+a `GET` never reaches the handler — and the `404` it falls through to is the same one a build with
+no OTA compiled in returns. Probing the endpoint in a browser proves nothing; neither does
+`/documentation` (which lists only `addRESTEndpoint()` routes, and `/update` is not one) nor
+`/status` (whose `switches_read_ok`/`switches_raw[]` are served by every build). A real `POST` is
+the only HTTP-level answer: an OTA build replies `401`/`409`/`200`, never `404`. See
+[API.md §4](API.md).
 
 ## Flash budget
 
@@ -268,13 +282,22 @@ Serial flashing remains the recovery path for a bricked OTA:
 
 ## Notes
 
-- **Every OTA costs exactly one framing error at every RS485 receiver on the bus.** A controller
-  hard reboot produces boot-ROM line chatter on the shared bus, which each listener rejects as a
-  single bad frame; an OTA reboots the controller by definition, so this is expected and benign.
-  Recorded here so it is not later mistaken for a fault. Supporting data: module 72's framing-error
-  counter was flat across 8.3 h overnight, and all 146 accumulated errors trace to a churn window
-  of phantom-touch traffic plus mid-soak reflashes — the bus is clean, so this `+1` is attributable
-  rather than noise.
+- **An OTA reboot cost one framing error at the one receiver that was instrumented.** A controller
+  hard reboot produces boot-ROM line chatter on the shared bus, which a listener rejects as a bad
+  frame; an OTA reboots the controller by definition, so a framing error around an OTA is expected
+  and benign rather than a fault. Recorded here so it is not later mistaken for one.
+
+  **What was actually measured:** one receiver (module 72), one reboot, `+1` on its framing-error
+  counter — a single observation from a single bench session on a single bus. Supporting data:
+  72's counter was flat across 8.3 h overnight, and all 146 accumulated errors trace to a churn
+  window of phantom-touch traffic plus mid-soak reflashes, so the bus was clean enough for that
+  `+1` to be attributable rather than noise.
+
+  The same `+1` is **expected** at every other receiver on the bus — they all see the same
+  chatter — but that **has not been measured**: no other receiver was instrumented, and the
+  counter only increments on corruption *after* a valid STX, so a listener that happens to be
+  mid-frame at the reboot could plausibly count differently. Treat "one per receiver" as the
+  working expectation, not as a fleet-wide measured fact.
 - LoRa is 915 MHz and WiFi is 2.4 GHz, so there is no RF band conflict.
 - **Current budget:** WiFi TX peaks around 500 mA on top of everything else, against an LM1117
   rated 800 mA. OTA is the worst case — WiFi busy while the rest of the system runs. Another
