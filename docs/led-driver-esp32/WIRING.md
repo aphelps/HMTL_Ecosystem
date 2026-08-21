@@ -54,6 +54,23 @@ experiment: keep it only if the bit-banged bus 2 shows no flicker under real loa
 buses sequentially, so the split does not halve frame time anyway; its benefits are shorter
 electrical runs (higher stable clock), independent failure domains, and injection layout.
 
+**Installed-geometry decision (2026-08):** the two 400-px strands are already installed **side
+by side and must display identically**, with **~24 ft between the last pixel of strand 1 and the
+first pixel of strand 2**. Side-by-side-identical is the deciding constraint and it rules out
+both alternatives:
+- **2×400 two outputs** — bus 2 is bit-banged; any flicker/timing difference vs bus 1's
+  hardware-SPI output would show as a visible seam between adjacent strands.
+- **Two independent controllers on plain WLED sync** — WLED device-sync is *state* sync (each
+  device animates locally from synced params), so dynamic effects **drift in phase** → a visible
+  offset side by side. Two controllers would only match if *frame-locked* (streamed pixels / a
+  master→slave frame push), which is real code, not a config toggle.
+
+Chosen approach: **single 800-px chain on bus 1**, with the 24 ft inter-strand gap bridged by a
+**differential clock/data extender (§8)**. One render engine, one clock domain → inherently
+frame-locked, physically extended across the gap — the best side-by-side match *and* the least
+code. Clock rate is runtime-tunable (§7), so the extender's reliable ceiling is found by
+sweeping, not reflashing.
+
 ## 3. Power — the LEDs dominate everything
 
 **400 WS2801 pixels ≈ 24 A at 5 V full-white worst case; 800 ≈ 48 A.** The board's LM1117 path
@@ -104,3 +121,74 @@ WLED_dev `ampworks`-family env with `USERMOD_RS485_BRIDGE` (`-D RS485_HARDWARE_S
 these boards have **no MPR121**, so the build for them should not enable the mpr121 usermod.
 Bridge + LED pins/baud are runtime config per §1. HMTL addresses for the two modules: TBD
 (71/72 are the trigger boards, 129 the fire controller).
+
+## 7. WS2801 SPI clock speed — runtime-tunable, not hardcoded
+
+The clocked-SPI rate is **configurable at runtime, no reflash** (verified in WLED 16.0.1 source):
+
+- **Default 2 MHz** if unset — `bus_manager.cpp:153` `_frequencykHz = bc.frequency ? bc.frequency : 2000U`.
+- **Per-bus, in kHz.** JSON key **`hw.led.ins[N].freq`** (`cfg.cpp:239` reads it, `:1002` writes
+  it back). Set via a POST to **`/json/cfg`** or by editing cfg.json — e.g. `freq: 1000` = 1 MHz,
+  `2000` = 2 MHz. Also exposed in the **LED Preferences UI** clock-speed field (`set.cpp:209`, the
+  `SP` arg).
+- **Label caveat:** the UI text and code comments say *"DotStar & PWM"*, but the bus wrapper routes
+  WS2801 (`I_HS_WS1_3`) through the **same** `beginDotStar → SetMethodSettings(NeoSpiSettings(clock))`
+  path as DotStar (`bus_wrapper.h:414`) — so it **does** apply to WS2801 despite the naming. Confirm
+  empirically on first run: set 1 MHz, scope the clock line, expect 1 MHz not 2.
+- **Ignore** the `// 1 MHz clock` at `bus_manager.cpp:397` — inside `#ifdef ESP8266`, irrelevant to
+  this ESP32.
+- **Frame-rate headroom:** 800 px @ 1 MHz ≈ 19 ms ≈ **52 Hz**, still above WLED's 42 FPS target, so
+  dropping to 1 MHz for signal-integrity margin over the extender (§8) costs no usable frame rate.
+
+**Bench step:** after wiring §8, **sweep `freq` live** (2000 → 1000) over the differential link and
+watch the far strand for pixel corruption; pick the highest clean rate. This makes the
+transceiver-vs-clock tradeoff a runtime A/B, not a firmware cycle.
+
+## 8. 24 ft inter-strand differential extension (single-chain across the gap)
+
+Chosen per §2: one 800-px chain, with the ~24 ft gap between strand 1's end and strand 2's start
+bridged by differential line drivers. The signals crossing the gap are the **5 V CKO/SDO** off the
+**last WS2801 of strand 1** into the **CKI/SDI of the first WS2801 of strand 2**. A WS2801 output
+can't drive 24 ft of line single-ended at MHz rates; differential drivers extend it cleanly.
+
+**Topology (simplex, one direction):** end of strand 1 → convert CKO and SDO each to a differential
+pair (driver) → 24 ft twisted pair → convert back to single-ended (receiver) → CKI/SDI of strand 2.
+
+**Transceiver choice — and the level-shift consequence:**
+
+| Option | Rail | Speed | Level shifting | Chips |
+|---|---|---|---|---|
+| **MAX485** | 5 V | 2.5 Mbps | **None** — 5 V matches WS2801 both ends | 4 (drv+rcv × 2 signals) |
+| MAX3485 | 3.3 V | 10 Mbps | **Both ends** — down 5→3.3 V at DI, up 3.3→5 V at RO (WS2801 V_IH ≈ 3.5 V) | 4 + 3.3 V reg + shifters |
+| **AM26LS31 / AM26LS32** (RS-422 quad) | 5 V | ~10 Mbps | **None** | 2 (one quad driver + one quad receiver) |
+
+- **Prefer a 5 V part:** MAX485 @ 1 MHz (no regulator, no shifting; 52 Hz > target), or AM26LS31/32
+  @ 2 MHz (no regulator, no shifting, 2 chips, purpose-built for clock+data extension). **Avoid
+  MAX3485 here** — its 3.3 V rail forces both a regulator and level shifting at *both* ends. (If a
+  3.3 V part is unavoidable, the board's existing **74AHCT125** does the far-end up-shift.)
+
+**Wiring detail:**
+- Tap CKO + SDO at the last WS2801 of strand 1 (leads in inches) into the driver inputs.
+- Enables static: driver end active (`DE` high / `RE` don't-care), receiver end active — simplex,
+  no direction switching.
+- **Terminate each pair 100–120 Ω at the receiver (far) end.** 120 Ω standard; 100 Ω matches Cat6
+  more exactly — either is fine at 24 ft / 1–2 MHz.
+- Receiver outputs → CKI/SDI of the first WS2801 of strand 2.
+- **Power each transceiver set from the LOCAL 5 V injection** already present at each strand — no
+  logic power over the gap.
+
+**Cabling — same Cat6/6A as the bus leads, and a good fit here:**
+- **One twisted pair = CLOCK differential; a second twisted pair = DATA differential.** Keep each
+  signal on **one** pair — never split a differential signal across pairs, never share a pair
+  between clock and data.
+- Both pairs in the **same Cat6 run are length-matched** → minimal clock/data skew, which is the
+  one thing that breaks a clocked differential link. (This is why one Cat6 run beats two separate
+  cables.)
+- Use a **third pair as a ground bond** between the two ends. Differential still needs a
+  common-mode reference (RS485/422 range is limited); grounds are already common via power
+  injection, but bond a conductor anyway.
+- **Never run LED power over Cat6** (unchanged rule — the gap carries only clock pair + data pair
+  + ground).
+
+**Result:** perfect side-by-side matching (single render, single clock domain) with the physical
+reach of two strands — no bit-bang flicker, no inter-controller sync/drift.
