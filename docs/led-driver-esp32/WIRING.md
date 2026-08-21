@@ -192,3 +192,93 @@ pair (driver) → 24 ft twisted pair → convert back to single-ended (receiver)
 
 **Result:** perfect side-by-side matching (single render, single clock domain) with the physical
 reach of two strands — no bit-bang flicker, no inter-controller sync/drift.
+
+### 8.1 Build guide — ST485BN / MAX485CPA (chips on hand, 20–24 ft Cat6)
+
+**Part choice:** ST485BN and MAX485CPA are spec-equivalent for this job — 5 V rail, 2.5 Mbps,
+~30 ns prop delay, and the **identical DIP-8 pinout** — so this guide applies verbatim to either.
+Use **four of the same part** if inventory allows; if mixing, keep each *signal path* homogeneous
+(both CLOCK chips one type, both DATA chips the other). **Design clock: 1 MHz** (`freq: 1000`,
+§7) — 2.5 Mbps parts are comfortable there and marginal at 2 MHz; try 2 MHz as a free experiment,
+expect to land at 1 MHz. 800 px @ 1 MHz ≈ 52 Hz > WLED's 42 FPS target, so no visible cost.
+
+**DIP-8 pinout (both parts identical):**
+
+```
+        ┌───u───┐
+   RO  1│       │8  VCC (5V)
+  /RE  2│       │7  B   (inverting)
+   DE  3│       │6  A   (non-inverting)
+   DI  4│       │5  GND
+        └───────┘
+```
+
+**Enable mnemonic — driver end: pins 2+3 tied HIGH. Receiver end: pins 2+3 tied LOW.**
+(Simplex, permanent: DE high enables the driver / RE̅ high disables the unused receiver, and
+vice-versa at the far end. The enables never toggle — this is a one-way link, not a bus, so no
+direction-control GPIO and no fail-safe bias resistors are needed. The driver is always on, so
+the line is never idle/undriven.)
+
+**Four chips total: 2 drivers at the strand-1 end, 2 receivers at the strand-2 end** — one each
+for CLOCK and DATA.
+
+**Strand-1 END — two DRIVER chips (one CLOCK, one DATA):**
+
+| Pin | Connect to |
+|---|---|
+| 4 DI | ← WS2801 output: CKO (clock chip) / SDO (data chip), last pixel of strand 1 — leads in inches |
+| 3 DE | → VCC (5 V) — driver permanently enabled |
+| 2 RE̅ | → VCC (5 V) — unused receiver disabled |
+| 1 RO | n/c |
+| 8 VCC | → **local** 5 V injection at strand 1 |
+| 5 GND | → local GND |
+| 6 A / 7 B | → one Cat6 pair (A=tip, B=ring), out to the far end |
+| — | 100 nF from pin 8 to pin 5, at the chip |
+
+**Strand-2 START — two RECEIVER chips (one CLOCK, one DATA):**
+
+| Pin | Connect to |
+|---|---|
+| 6 A / 7 B | ← the matching Cat6 pair from the driver end |
+| 2 RE̅ | → GND — receiver permanently enabled |
+| 3 DE | → GND — unused driver disabled |
+| 4 DI | → GND (tie off, unused) |
+| 1 RO | → WS2801 input: CKI (clock chip) / SDI (data chip), first pixel of strand 2 — leads in inches |
+| 8 VCC | → **local** 5 V injection at strand 2 |
+| 5 GND | → local GND |
+| 6–7 | **120 Ω across A–B** (termination — receiver end only) |
+| — | 100 nF from pin 8 to pin 5, at the chip |
+
+**Cat6 pair assignment (20–24 ft run, one cable):**
+
+| Cat6 pair | Carries | Notes |
+|---|---|---|
+| Pair 1 (e.g. blue) | CLOCK A/B | one differential signal = one twisted pair |
+| Pair 2 (e.g. orange) | DATA A/B | keep clock and data on **separate** pairs |
+| Pair 3 (e.g. green) | GROUND bond | tie both conductors together, both ends, → GND each end |
+| Pair 4 (e.g. brown) | spare | leave for a 2nd ground or a future signal |
+
+- **Never split A and B across different pairs**, and never share a pair between clock and data —
+  A/B of one signal must be the two wires of the *same* twisted pair (that twist is what rejects
+  common-mode noise from nearby solenoid/12 V wiring).
+- Clock and data pairs share the same cable → equal length → clock/data skew is a few ns against a
+  500 ns (1 MHz) bit window. That skew margin is why this works; it evaporates if you ever run clock
+  and data on two *different* cables.
+- **Ground bond is required, not optional** — RS-485 is differential but still needs the two ends
+  within its ±7 V common-mode window. Power injection makes grounds nominally common; the bond
+  guarantees it.
+- **No LED power on the Cat6.** The gap carries clock pair + data pair + ground, nothing else.
+
+**No series resistors on the short hops** (WS2801→DI and RO→WS2801 are inches, not transmission
+lines). The only termination in this stage is the 120 Ω at each receiver. The 91 Ω source
+resistors from §4 stay where they are — on the controller→strand-1 leads, a different segment.
+
+**Bring-up sequence:**
+1. Wire and power both ends (local 5 V each). With WLED idle, drivers hold the lines at the
+   WS2801 idle level — a scope on A–B at the receiver should show a clean differential idle.
+2. Set the bus to **`freq: 2000`** (2 MHz) first as a free experiment — it may pass at 24 ft.
+   Push full-white + a fast effect; watch the **strand-2** pixels for sparkle/wrong colours.
+3. If strand 2 shows corruption, drop to **`freq: 1000`** (1 MHz) — the design point. Re-test.
+   1 MHz gives ~52 Hz refresh, above WLED's 42 FPS, so there is no visible cost to running there.
+4. Confirm strand 1 and strand 2 are pixel-identical side by side under motion — that is the whole
+   point of the single-chain topology, and the pass criterion for this stage.
