@@ -39,3 +39,25 @@ installed. **Prototype complete 2026-08-19** — board 1 is a working WLED+RS485
 **Next:** second board build · 800-px strand + Cat6A run (on order) · 2 MHz clock validation
 with live FPS · filed tasks: HMTL Command Server vs ESP32 (HMTL_Ecosystem), REST HMTL endpoint
 (WLED_dev, P4) · addresses 96+ for this family (71/72 trigger boards, 129 fire controller).
+
+## Session 2 — 2026-08-21 — first production board: Lightbringer Ceiling
+
+**Board 2 (first non-breadboard build) flashed and deployed** as HMTL addr 97,
+`http://lightbringer-ceiling.local` on "CBCI-0970" — full details in `docs/DEVICES.md`.
+Flashed `[env:led_driver_ceiling]` (gitignored override: baked WiFi creds, addr 97,
+SERVERNAME/MDNS_NAME) over USB; fresh board so compile defaults seeded cleanly; runtime
+cfg set 800 px @ 2 MHz, ABL 8 A, rainbow boot preset. RS485 bridge verified in cfg
+(uart2, rx5/tx19/en18, 28000 baud, UDP 21331) — not yet exercised on a bus from this board.
+
+**Also this session (WLED_dev `camera-ledmap-tool` branch):** camera-based LED position
+mapper (`tools/ledmap_camera`) written for mapping the ceiling's triangle lattice to a
+WLED 2D ledmap; adversarially reviewed against firmware source and hardened (compact
+`"map":[` serialization required by the firmware's literal parser; identity-map
+neutralize before re-sweeps; `rSeg` after live reload; crash-safe sweep; gap-based
+auto-threshold). Solve validated on a synthetic 800-px serpentine triangle lattice.
+Mapping session pending: iPhone-on-floor Continuity Camera (camera index 1 last
+enumerated), array on ceiling.
+
+**Interim:** "Lightbringer Test" (old WLED Strip board, data 4/clock 16) was reflashed
+to current firmware and configured 800 px / 8 A as a stopgap driver for the installed
+LEDs; superseded by Lightbringer Ceiling.
