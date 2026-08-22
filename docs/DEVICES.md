@@ -54,9 +54,12 @@ extension per `led-driver-esp32/WIRING.md` §8).
   - **App-first device**: setup REQUIRES the Deco app + TP-Link ID +
     working internet — do ALL setup and updates at home before the burn.
     The web UI (tplinkdeco.net / 192.168.68.1) is diagnostics-only.
-  - **Offline on-playa**: mesh + LAN keep working with no WAN (status LED
-    goes red, ignore it); app manages locally only from a phone joined to
-    the Deco WiFi; some settings can't change without internet.
+  - **On-playa WAN: Starlink is available** (camp has connectivity), so
+    cloud-dependent app management keeps working when the Deco's WAN is
+    fed from it (Starlink ethernet adapter → Deco WAN port). Still
+    complete setup before departure; if Starlink is down the mesh + LAN
+    keep working (status LED goes red, ignore it) and the app manages
+    locally from a phone joined to the Deco WiFi.
   - **ESP32 clients**: disable band steering or use the IoT/2.4GHz-only
     network feature for the "Lightbringer" SSID; set security to
     **WPA2-PSK only** (WPA2/WPA3-mixed breaks ESP32 joins); do NOT enable
