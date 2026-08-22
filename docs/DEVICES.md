@@ -34,9 +34,19 @@ extension per `led-driver-esp32/WIRING.md` §8).
   point (~52 fps wire ceiling, above WLED's 42 fps target).
 - **RS485:** MAX3485, RX 5 / TX 19 / EN 18, 28000 baud, HMTL addr **97**,
   bridge UDP port 21331.
+- **Audio: UDP Sound Sync RECEIVE is standard config** — no local mic; a
+  mic-equipped WLED device on the same network sends (multicast
+  239.0.0.1:11988, v2 format). **PENDING: board went offline 2026-08-21
+  before this was applied** — run when next reachable:
+  `curl -X POST http://lightbringer-ceiling.local/json/cfg -H 'Content-Type: application/json' -d '{"um":{"AudioReactive":{"enabled":true,"sync":{"port":11988,"mode":2}}}}'`
+  (mode bitfield: 1=send, 2=receive; exactly one sender per network.)
+- **Context:** the Lightbringer is a Burning Man mutant vehicle — its
+  network/location changes. On-site WiFi: dedicated travel router
+  preferred; ESP32/WLED-AP fallback works for a handful of devices (see
+  bench log).
 - **Pending:** camera ledmap session (`WLED_dev tools/ledmap_camera`,
   iPhone-on-floor Continuity Camera) to map the triangle lattice to a 2D
-  grid.
+  grid. Apply the audio-receive cfg above.
 
 ## Other WLED devices (not on the HMTL bus)
 
