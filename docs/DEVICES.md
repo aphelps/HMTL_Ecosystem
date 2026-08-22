@@ -69,6 +69,26 @@ extension per `led-driver-esp32/WIRING.md` §8).
     use a 12→48 V PoE+ injector or an inverter.
   - **Failover**: a spare ESP32 running a WLED AP with the SAME
     SSID/password substitutes with zero device reconfig (≤4 clients).
+- **Router VERIFIED 2026-08-22** (home bench, Deco WAN fed from Acropolis
+  LAN as the Starlink stand-in): ESP32 joins on 2.4 GHz/WPA2 (5 GHz
+  disabled on the Deco in lieu of a band-steering toggle; -47 dBm);
+  clients get internet via Deco NAT; **UDP multicast audio sync delivered**
+  (synthetic v2 sender `WLED_dev tools/send_audiosync.py` → TouchTower
+  "receiving", GEQ reacting); local HTTP control works. Deco auto-picked
+  2.4 GHz **channel 3** — pin to 1/6/11 in the app for playa if exposed.
+  Deco LAN is 192.168.68.0/22, gateway .68.1.
+- **Audio sender for the vehicle: UNDECIDED** — TouchTower's mic, or a
+  dedicated low-profile LED-less ESP32 + I2S mic (INMP441-class) as a
+  mic-only sender node. Exactly one sender on the network.
+
+## TouchTower
+
+WLED touch device: 5×5 matrix, MPR121 touch, AudioReactive with local
+mic, SensorSync (`touch-grid-effect` branch build). `touchtower.local`.
+Known networks (in priority order): **Lightbringer**, Acropolis — it
+prefers the vehicle network wherever both are visible. Audio sync mode
+is **off** (local mic processing); flip to send (`sync.mode:1`) if it
+becomes the vehicle's sender.
 - **Pending:** camera ledmap session (`WLED_dev tools/ledmap_camera`,
   iPhone-on-floor Continuity Camera) to map the triangle lattice to a 2D
   grid. Apply the audio-receive cfg above.
