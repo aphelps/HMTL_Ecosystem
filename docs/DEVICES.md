@@ -41,9 +41,31 @@ extension per `led-driver-esp32/WIRING.md` §8).
   `curl -X POST http://lightbringer-ceiling.local/json/cfg -H 'Content-Type: application/json' -d '{"um":{"AudioReactive":{"enabled":true,"sync":{"port":11988,"mode":2}}}}'`
   (mode bitfield: 1=send, 2=receive; exactly one sender per network.)
 - **Context:** the Lightbringer is a Burning Man mutant vehicle — its
-  network/location changes. On-site WiFi: dedicated travel router
-  preferred; ESP32/WLED-AP fallback works for a handful of devices (see
-  bench log).
+  network/location changes.
+
+## Lightbringer vehicle network
+
+- **SSID "Lightbringer"** — credentials in the gitignored
+  `WLED_dev/WLED/platformio_override.ini` (never in committed files).
+  Every vehicle WLED device gets it in its known-network list (runtime
+  `nw.ins`) alongside its bench SSID.
+- **Router: TP-Link Deco X50-Outdoor** (AX3000, IP65). Deployment notes
+  from 2026-08 research:
+  - **App-first device**: setup REQUIRES the Deco app + TP-Link ID +
+    working internet — do ALL setup and updates at home before the burn.
+    The web UI (tplinkdeco.net / 192.168.68.1) is diagnostics-only.
+  - **Offline on-playa**: mesh + LAN keep working with no WAN (status LED
+    goes red, ignore it); app manages locally only from a phone joined to
+    the Deco WiFi; some settings can't change without internet.
+  - **ESP32 clients**: disable band steering or use the IoT/2.4GHz-only
+    network feature for the "Lightbringer" SSID; set security to
+    **WPA2-PSK only** (WPA2/WPA3-mixed breaks ESP32 joins); do NOT enable
+    client/IoT isolation (it would kill UDP multicast audio sync and
+    phone→WLED control).
+  - **Power**: 802.3at PoE+ (≤18 W) or its AC adapter — from vehicle 12 V,
+    use a 12→48 V PoE+ injector or an inverter.
+  - **Failover**: a spare ESP32 running a WLED AP with the SAME
+    SSID/password substitutes with zero device reconfig (≤4 clients).
 - **Pending:** camera ledmap session (`WLED_dev tools/ledmap_camera`,
   iPhone-on-floor Continuity Camera) to map the triangle lattice to a 2D
   grid. Apply the audio-receive cfg above.
