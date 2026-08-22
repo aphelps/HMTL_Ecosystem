@@ -27,8 +27,11 @@ extension per `led-driver-esp32/WIRING.md` §8).
 - **Network:** WiFi "CBCI-0970", `http://lightbringer-ceiling.local`
   (10.1.10.163 at last check). Name + mDNS hostname are compile-baked.
 - **LEDs:** 800×WS2801, data GPIO 25 / clock GPIO 23 (74AHCT125 shifted),
-  2 MHz bus clock (drop to 1 MHz if the far strand sparkles — runtime
-  `hw.led.ins[0].freq`), ABL 8000 mA @ 55 mA/LED, rainbow boot preset 1.
+  color order **BRG**, ABL 8000 mA @ 55 mA/LED, rainbow boot preset 1.
+- **Bus clock: 1.5 MHz standard** (`hw.led.ins[0].freq: 1500`). Bench result
+  2026-08-21: 2 MHz flickered near the end of strand 1 on the installed
+  array, 1 MHz and 1.5 MHz clean — 1.5 MHz is the validated operating
+  point (~52 fps wire ceiling, above WLED's 42 fps target).
 - **RS485:** MAX3485, RX 5 / TX 19 / EN 18, 28000 baud, HMTL addr **97**,
   bridge UDP port 21331.
 - **Pending:** camera ledmap session (`WLED_dev tools/ledmap_camera`,
