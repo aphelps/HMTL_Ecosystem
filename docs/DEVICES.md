@@ -83,12 +83,22 @@ extension per `led-driver-esp32/WIRING.md` §8).
 
 ## TouchTower
 
-WLED touch device: 5×5 matrix, MPR121 touch, AudioReactive with local
-mic, SensorSync (`touch-grid-effect` branch build). `touchtower.local`.
-Known networks (in priority order): **Lightbringer**, Acropolis — it
-prefers the vehicle network wherever both are visible. Audio sync mode
-is **off** (local mic processing); flip to send (`sync.mode:1`) if it
-becomes the vehicle's sender.
+WLED touch device: 5×5 APA102 matrix (pins 32/33), MPR121 touch (I2C
+0x5A on SDA 19 / SCL 22), AudioReactive with local mic, SensorSync.
+`touchtower.local`. AP fallback SSID: `WLED-TOUCH-BOX` (default pass).
+**Updated 2026-08-28 on playa**: OTA'd from the old `touch-grid-effect`
+June build to origin/main @ 8ea0be8c (`apa102_mpr121` env). Known
+networks (priority order): **Lightbringer**, Verizon-MiFi8800L-5BD4
+(playa jetpack, creds in WLED_dev `platformio_override.ini`), Acropolis.
+Audio sync mode is **off** (local mic processing); flip to send
+(`sync.mode:1`) if it becomes the vehicle's sender.
+
+⚠ **Fleet gotcha found during this update**: current WLED main requires
+the global I2C pins in *runtime config* (`hw.if.i2c-pin`) — the
+`I2CSDAPIN`/`I2CSCLPIN` compile defines are no longer sufficient, and
+the MPR121 usermod silently reports "not found" when they're unset.
+After flashing main onto any older MPR121 board, set
+`{"hw":{"if":{"i2c-pin":[19,22]}}}` and reboot.
 - **Pending:** camera ledmap session (`WLED_dev tools/ledmap_camera`,
   iPhone-on-floor Continuity Camera) to map the triangle lattice to a 2D
   grid. Apply the audio-receive cfg above.
