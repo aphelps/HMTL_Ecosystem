@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>RS-485 Differential Extension — WS2801 Inter-Strand Bridge</title>
+<style>
+  @page { size: letter; margin: 0.55in; }
+  * { box-sizing: border-box; }
+  body { font: 10.5pt/1.45 -apple-system, "Helvetica Neue", Arial, sans-serif;
+         color: #1a1a1a; margin: 0; }
+  h1 { font-size: 17pt; margin: 0 0 2px; }
+  .sub { color: #555; margin: 0 0 14px; font-size: 10pt; }
+  h2 { font-size: 12.5pt; margin: 16px 0 6px; border-bottom: 1.5px solid #333; padding-bottom: 2px; }
+  table { border-collapse: collapse; width: 100%; margin: 6px 0 10px; font-size: 9.5pt; }
+  th, td { border: 1px solid #999; padding: 3px 7px; text-align: left; vertical-align: top; }
+  th { background: #eee; }
+  .two-col { display: flex; gap: 14px; }
+  .two-col > div { flex: 1; }
+  .warn { background: #fff3e0; border-left: 4px solid #e65100; padding: 6px 10px; margin: 8px 0; font-size: 9.5pt; }
+  .mnemonic { background: #e8f0e8; border-left: 4px solid #2e6b2e; padding: 6px 10px; margin: 8px 0;
+              font-size: 11pt; font-weight: 600; }
+  code { font-family: Menlo, monospace; font-size: 9pt; background: #f2f2f2; padding: 0 3px; }
+  .schematic { margin: 8px 0 4px; }
+  .cap { font-size: 8.5pt; color: #555; margin: 0 0 10px; }
+  ol, ul { margin: 4px 0 8px; padding-left: 20px; }
+  li { margin: 2px 0; }
+  .pagebreak { break-before: page; }
+  footer { margin-top: 14px; font-size: 8.5pt; color: #777; border-top: 1px solid #ccc; padding-top: 4px; }
+</style>
+</head>
+<body>
+
+<h1>RS-485 Differential Extension — WS2801 Inter-Strand Bridge</h1>
+<p class="sub">Bridges the ~24 ft gap between LED strand 1 (end) and strand 2 (start) of one
+800-pixel WS2801 chain, carrying the 5&nbsp;V CKO/SDO clock and data differentially over one Cat6 run.
+Simplex, one direction, no direction switching. &nbsp;·&nbsp; Lightbringer project · 2026-08</p>
+
+<div class="mnemonic">Enable mnemonic — DRIVER end (strand 1): pins 2+3 tied HIGH (5&nbsp;V).
+RECEIVER end (strand 2): pins 2+3 tied LOW (GND).</div>
+
+<h2>Schematic</h2>
+<svg class="schematic" viewBox="0 0 760 418" width="100%" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1a1a1a"/>
+    </marker>
+  </defs>
+  <style>
+    .wire { stroke: #1a1a1a; stroke-width: 1.4; fill: none; }
+    .blue { stroke: #1565c0; } .orange { stroke: #e65100; } .green { stroke: #2e7d32; }
+    .pwr { stroke: #c62828; } .gnd { stroke: #1a1a1a; }
+    .sym { stroke: #1a1a1a; stroke-width: 1.6; fill: #fff; }
+    .lbl { font: 9px Menlo, monospace; fill: #1a1a1a; }
+    .lbl2 { font: 8px Menlo, monospace; fill: #444; }
+    .big { font: 600 11px -apple-system, Arial, sans-serif; fill: #1a1a1a; }
+    .zone { fill: none; stroke: #bbb; stroke-dasharray: 4 3; }
+  </style>
+
+  <!-- zones -->
+  <rect class="zone" x="4" y="26" width="240" height="360" rx="6"/>
+  <text class="big" x="14" y="44">STRAND 1 END — local 5V</text>
+  <rect class="zone" x="516" y="26" width="240" height="360" rx="6"/>
+  <text class="big" x="526" y="44">STRAND 2 START — local 5V</text>
+  <text class="big" x="322" y="44">Cat6, 20–24 ft</text>
+
+  <!-- ===================== CLOCK channel ===================== -->
+  <text class="big" x="14" y="86">CLOCK</text>
+  <!-- WS2801 out -->
+  <rect class="sym" x="14" y="96" width="58" height="46"/>
+  <text class="lbl" x="20" y="110">WS2801</text><text class="lbl" x="20" y="121">last px</text>
+  <text class="lbl" x="20" y="136">CKO ▸</text>
+  <!-- driver triangle -->
+  <path class="sym" d="M130,96 L190,119 L130,142 z"/>
+  <text class="lbl" x="138" y="123">DRV</text>
+  <line class="wire" x1="72" y1="119" x2="130" y2="119" marker-end="url(#arr)"/>
+  <text class="lbl2" x="88" y="114">4 DI</text>
+  <!-- enables high -->
+  <line class="wire pwr" x1="150" y1="107" x2="150" y2="72"/>
+  <text class="lbl2" x="128" y="68">2 RE̅ + 3 DE → 5V</text>
+  <!-- vcc/gnd/cap -->
+  <line class="wire pwr" x1="150" y1="131" x2="150" y2="160"/>
+  <text class="lbl2" x="156" y="156">8 VCC=5V</text>
+  <text class="lbl2" x="156" y="167">5 GND ⏚  + 0.1µF @ chip</text>
+  <!-- A/B out -->
+  <line class="wire blue" x1="190" y1="112" x2="516" y2="112"/>
+  <line class="wire blue" x1="190" y1="127" x2="516" y2="127"/>
+  <text class="lbl2" x="196" y="108">6 A</text>
+  <text class="lbl2" x="196" y="140">7 B</text>
+  <text class="lbl" x="330" y="106" fill="#1565c0">blue pair (twisted)</text>
+  <!-- twist marks -->
+  <path class="wire blue" d="M300,112 q8,7.5 16,0 M300,127 q8,-7.5 16,0" stroke-width="1"/>
+  <path class="wire blue" d="M420,112 q8,7.5 16,0 M420,127 q8,-7.5 16,0" stroke-width="1"/>
+  <!-- receiver triangle -->
+  <path class="sym" d="M560,96 L620,119 L560,142 z"/>
+  <text class="lbl" x="568" y="123">RCV</text>
+  <text class="lbl2" x="524" y="108">6 A</text>
+  <text class="lbl2" x="524" y="140">7 B</text>
+  <!-- 120R termination -->
+  <rect class="sym" x="540" y="113" width="14" height="14"/>
+  <line class="wire blue" x1="547" y1="112" x2="547" y2="113"/>
+  <line class="wire blue" x1="547" y1="127" x2="547" y2="127"/>
+  <text class="lbl2" x="527" y="152">120 ohm</text>
+  <!-- enables low -->
+  <line class="wire gnd" x1="580" y1="107" x2="580" y2="72"/>
+  <text class="lbl2" x="558" y="68">2 RE̅ + 3 DE → GND</text>
+  <!-- RO out -->
+  <line class="wire" x1="620" y1="119" x2="678" y2="119" marker-end="url(#arr)"/>
+  <text class="lbl2" x="628" y="114">1 RO</text>
+  <rect class="sym" x="678" y="96" width="58" height="46"/>
+  <text class="lbl" x="684" y="110">WS2801</text><text class="lbl" x="684" y="121">first px</text>
+  <text class="lbl" x="684" y="136">▸ CKI</text>
+  <text class="lbl2" x="600" y="160">8 VCC=5V · 5 GND ⏚ · 4 DI→GND</text>
+  <text class="lbl2" x="600" y="171">+ 0.1µF @ chip</text>
+
+  <!-- ===================== DATA channel ===================== -->
+  <text class="big" x="14" y="226">DATA</text>
+  <rect class="sym" x="14" y="236" width="58" height="46"/>
+  <text class="lbl" x="20" y="250">WS2801</text><text class="lbl" x="20" y="261">last px</text>
+  <text class="lbl" x="20" y="276">SDO ▸</text>
+  <path class="sym" d="M130,236 L190,259 L130,282 z"/>
+  <text class="lbl" x="138" y="263">DRV</text>
+  <line class="wire" x1="72" y1="259" x2="130" y2="259" marker-end="url(#arr)"/>
+  <text class="lbl2" x="88" y="254">4 DI</text>
+  <line class="wire pwr" x1="150" y1="247" x2="150" y2="212"/>
+  <text class="lbl2" x="128" y="208">2 RE̅ + 3 DE → 5V</text>
+  <line class="wire pwr" x1="150" y1="271" x2="150" y2="300"/>
+  <text class="lbl2" x="156" y="296">8 VCC=5V</text>
+  <text class="lbl2" x="156" y="307">5 GND ⏚  + 0.1µF @ chip</text>
+  <line class="wire orange" x1="190" y1="252" x2="516" y2="252"/>
+  <line class="wire orange" x1="190" y1="267" x2="516" y2="267"/>
+  <text class="lbl2" x="196" y="248">6 A</text>
+  <text class="lbl2" x="196" y="280">7 B</text>
+  <text class="lbl" x="322" y="246" fill="#e65100">orange pair (twisted)</text>
+  <path class="wire orange" d="M300,252 q8,7.5 16,0 M300,267 q8,-7.5 16,0" stroke-width="1"/>
+  <path class="wire orange" d="M420,252 q8,7.5 16,0 M420,267 q8,-7.5 16,0" stroke-width="1"/>
+  <path class="sym" d="M560,236 L620,259 L560,282 z"/>
+  <text class="lbl" x="568" y="263">RCV</text>
+  <text class="lbl2" x="524" y="248">6 A</text>
+  <text class="lbl2" x="524" y="280">7 B</text>
+  <rect class="sym" x="540" y="253" width="14" height="14"/>
+  <text class="lbl2" x="527" y="292">120 ohm</text>
+  <line class="wire gnd" x1="580" y1="247" x2="580" y2="212"/>
+  <text class="lbl2" x="558" y="208">2 RE̅ + 3 DE → GND</text>
+  <line class="wire" x1="620" y1="259" x2="678" y2="259" marker-end="url(#arr)"/>
+  <text class="lbl2" x="628" y="254">1 RO</text>
+  <rect class="sym" x="678" y="236" width="58" height="46"/>
+  <text class="lbl" x="684" y="250">WS2801</text><text class="lbl" x="684" y="261">first px</text>
+  <text class="lbl" x="684" y="276">▸ SDI</text>
+  <text class="lbl2" x="600" y="300">8 VCC=5V · 5 GND ⏚ · 4 DI→GND</text>
+  <text class="lbl2" x="600" y="311">+ 0.1µF @ chip</text>
+
+  <!-- ===================== ground bond ===================== -->
+  <line class="wire green" x1="60" y1="352" x2="700" y2="352"/>
+  <path class="wire green" d="M300,352 q8,7.5 16,0 M316,352 q8,-7.5 16,0" stroke-width="1"/>
+  <path class="wire green" d="M420,352 q8,7.5 16,0 M436,352 q8,-7.5 16,0" stroke-width="1"/>
+  <text class="lbl" x="286" y="344" fill="#2e7d32">green pair — ground bond (both conductors tied together)</text>
+  <text class="lbl" x="24" y="372">strand-1 GND ⏚</text>
+  <text class="lbl" x="640" y="372">strand-2 GND ⏚</text>
+  <line class="wire green" x1="60" y1="352" x2="60" y2="358"/>
+  <line class="wire green" x1="700" y1="352" x2="700" y2="358"/>
+  <text class="lbl2" x="24" y="384">brown pair: spare</text>
+
+  <!-- DIP-8 inset -->
+  <g transform="translate(180,404)">
+    <text class="lbl2" x="0" y="0">DIP-8 (both parts): 1 RO · 2 RE̅ · 3 DE · 4 DI · 5 GND · 6 A · 7 B · 8 VCC</text>
+  </g>
+</svg>
+<p class="cap">Four chips total: 2 drivers at the strand-1 end, 2 receivers at the strand-2 start —
+one each for CLOCK and DATA. ST485BN and MAX485CPA are interchangeable here (identical pinout,
+5&nbsp;V, 2.5&nbsp;Mbps); use four of the same part if stock allows, otherwise keep each signal path
+homogeneous (both CLOCK chips one type, both DATA chips the other). Each end is powered from the
+<b>local</b> 5&nbsp;V injection already present at its strand — no logic power crosses the gap.</p>
+
+<div class="two-col">
+<div>
+<h2>Driver end (strand 1) — per chip</h2>
+<table>
+<tr><th>Pin</th><th>Connect to</th></tr>
+<tr><td>4 DI</td><td>WS2801 output: CKO (clock chip) / SDO (data chip), leads in inches</td></tr>
+<tr><td>3 DE</td><td>5 V — driver always enabled</td></tr>
+<tr><td>2 RE̅</td><td>5 V — unused receiver disabled</td></tr>
+<tr><td>1 RO</td><td>no connect</td></tr>
+<tr><td>8 VCC</td><td>local 5 V injection</td></tr>
+<tr><td>5 GND</td><td>local GND</td></tr>
+<tr><td>6 A / 7 B</td><td>one Cat6 pair, out to far end</td></tr>
+<tr><td>—</td><td>0.1 µF pin 8→5, at the chip</td></tr>
+</table>
+</div>
+<div>
+<h2>Receiver end (strand 2) — per chip</h2>
+<table>
+<tr><th>Pin</th><th>Connect to</th></tr>
+<tr><td>6 A / 7 B</td><td>matching Cat6 pair + <b>120 Ω across A–B</b> (this end only)</td></tr>
+<tr><td>2 RE̅</td><td>GND — receiver always enabled</td></tr>
+<tr><td>3 DE</td><td>GND — unused driver disabled</td></tr>
+<tr><td>4 DI</td><td>GND (tie off)</td></tr>
+<tr><td>1 RO</td><td>WS2801 input: CKI (clock chip) / SDI (data chip), leads in inches</td></tr>
+<tr><td>8 VCC</td><td>local 5 V injection</td></tr>
+<tr><td>5 GND</td><td>local GND</td></tr>
+<tr><td>—</td><td>0.1 µF pin 8→5, at the chip</td></tr>
+</table>
+</div>
+</div>
+
+<h2>Cat6 pair assignment</h2>
+<table>
+<tr><th>Pair</th><th>Carries</th><th>Rule</th></tr>
+<tr><td>Blue</td><td>CLOCK A/B</td><td rowspan="2">A and B of one signal must be the two wires of the
+<b>same</b> twisted pair — never split a signal across pairs, never share a pair between clock and data</td></tr>
+<tr><td>Orange</td><td>DATA A/B</td></tr>
+<tr><td>Green</td><td>Ground bond</td><td>both conductors tied together, connected to GND at both ends — required, not optional</td></tr>
+<tr><td>Brown</td><td>spare</td><td>reserve for a second ground or future signal</td></tr>
+</table>
+
+<div class="warn"><b>Never run LED power over the Cat6.</b> The gap carries the clock pair, data pair,
+and ground bond — nothing else. No series resistors on the short chip↔WS2801 hops (they are inches,
+not transmission lines); the only termination in this stage is the 120 Ω at each receiver.</div>
+
+<h2>Parts list (one bridge)</h2>
+<table>
+<tr><th>Qty</th><th>Part</th><th>Note</th></tr>
+<tr><td>4</td><td>ST485BN or MAX485CPA, DIP-8</td><td>2 drivers + 2 receivers; DIP-8 sockets recommended</td></tr>
+<tr><td>2</td><td>120 Ω, ¼ W</td><td>termination, receiver end only, one per pair</td></tr>
+<tr><td>4</td><td>0.1 µF ceramic ("104")</td><td>one per chip, pins 8–5, close to the chip</td></tr>
+<tr><td>1</td><td>Cat6/6A, 20–24 ft</td><td>solid bare copper, unshielded is fine</td></tr>
+<tr><td>2</td><td>small perfboard + terminals</td><td>one per end</td></tr>
+</table>
+
+<h2>Bring-up sequence</h2>
+<ol>
+<li>Wire and power both ends from their local 5 V. With the controller idle, a scope across A–B at
+the receiver shows a clean differential idle (the driver is always on — the line is never floating).</li>
+<li>Run at the chain's standard clock — currently <b>1.5 MHz</b> (<code>hw.led.ins[0].freq: 1500</code>,
+validated on the installed array). Push full white plus a fast effect; watch <b>strand-2</b> pixels
+for sparkle or wrong colours.</li>
+<li>If strand 2 shows corruption, drop to <b>1 MHz</b> (<code>freq: 1000</code>) — a runtime config
+change, no reflash. 800 px at 1 MHz still refreshes ~52 Hz, above WLED's 42 fps target: no visible cost.</li>
+<li>Pass criterion: strand 1 and strand 2 pixel-identical side by side under motion.</li>
+</ol>
+
+<footer>HMTL / Lightbringer — from <code>docs/led-driver-esp32/WIRING.md</code> §8.1 · generated 2026-08-27</footer>
+</body>
+</html>
