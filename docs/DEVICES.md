@@ -12,7 +12,7 @@ built, re-addressed, or retired.
 | 96 | LED driver prototype | SparkFun ESP32 LoRa 1-CH Gateway (breadboard) | WLED `led_driver_wifi` env, WiFi "Acropolis", first WLED+RS485 board |
 | 97 | **Lightbringer Ceiling** | SparkFun ESP32 LoRa 1-CH Gateway (first non-breadboard build) | WLED `led_driver_ceiling` env — see below |
 | 129 | Fire controller | SparkFun ESP32 LoRa 1-CH Gateway | HMTL_Fire_Control_Wickerman (MPR121 touch, MCP23017 switches) |
-| 128 | Classic fire controller (2014 wooden box) | AVR nano328 | `lightbringer` env, reflashed 2026-08-28 targeting the vehicle's poofers 71/72 + lights 67 (interim until new touchcontroller board is built) |
+| 128 | Classic fire controller (2014 wooden box) | AVR nano328 | `firecontroller_lightbringer` env, reflashed 2026-08-28 targeting the vehicle's poofers 71/72 + lights 67 (interim until new touchcontroller board is built) |
 
 Address conventions: 71/72 trigger boards, 129 fire controller, 96+ WLED
 LED-driver family.
