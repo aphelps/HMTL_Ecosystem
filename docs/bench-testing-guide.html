@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Bench Testing Guide — outstanding hardware tests</title>
+<style>
+  @page { size: letter; margin: 0.55in; }
+  * { box-sizing: border-box; }
+  body { font: 10.5pt/1.45 -apple-system, "Helvetica Neue", Arial, sans-serif; color: #1a1a1a; margin: 0; }
+  h1 { font-size: 17pt; margin: 0 0 2px; }
+  .sub { color: #555; margin: 0 0 14px; font-size: 10pt; }
+  h2 { font-size: 12.5pt; margin: 16px 0 6px; border-bottom: 1.5px solid #333; padding-bottom: 2px; }
+  h3 { font-size: 11pt; margin: 12px 0 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 6px 0 10px; font-size: 9.5pt; }
+  th, td { border: 1px solid #999; padding: 3px 7px; text-align: left; vertical-align: top; }
+  th { background: #eee; }
+  .warn { background: #fff3e0; border-left: 4px solid #e65100; padding: 6px 10px; margin: 8px 0; font-size: 9.5pt; }
+  .pass { background: #e8f0e8; border-left: 4px solid #2e6b2e; padding: 6px 10px; margin: 8px 0; font-size: 9.5pt; }
+  .fail { background: #fdecea; border-left: 4px solid #b3261e; padding: 6px 10px; margin: 8px 0; font-size: 9.5pt; }
+  code { font-family: Menlo, monospace; font-size: 9pt; background: #f2f2f2; padding: 0 3px; }
+  pre { font-family: Menlo, monospace; font-size: 8.5pt; background: #f6f6f6; border: 1px solid #ddd;
+        padding: 6px 8px; margin: 5px 0 9px; white-space: pre-wrap; word-break: break-word; }
+  ol, ul { margin: 4px 0 8px; padding-left: 20px; }
+  li { margin: 2px 0; }
+  .pagebreak { break-before: page; }
+  .kicker { font-size: 9pt; color: #444; margin: 0 0 8px; }
+  footer { margin-top: 14px; font-size: 8.5pt; color: #777; border-top: 1px solid #ccc; padding-top: 4px; }
+</style>
+</head>
+<body>
+
+<h1>Bench Testing Guide</h1>
+<p class="sub">Step-by-step procedures for every hardware test currently outstanding across the
+HMTL / WLED / esp-now-router ecosystem. Each test states what to connect, the exact commands, what
+counts as a pass, and — where it matters — what a <em>false</em> pass looks like.
+&nbsp;·&nbsp; Generated 2026-08-29</p>
+
+<h2>0. Read this first — four traps that have already cost time</h2>
+<table>
+<tr><th>Trap</th><th>What to do instead</th></tr>
+<tr><td><b>USB port names reshuffle</b> on every replug. <code>usbserial-0001</code> is not a stable identity.</td>
+    <td>Re-derive port&rarr;MAC every session with <code>esptool chip_id</code> before flashing. Flashing the wrong board looks like a firmware bug.</td></tr>
+<tr><td><b>NVS shadows compile-time WiFi credentials.</b> Rebuilding with a new SSID changes nothing on its own.</td>
+    <td><code>esptool erase_flash</code> before flashing any build whose credentials changed. The boot line shows the SSID actually in use.</td></tr>
+<tr><td><b>Re-provisioning is not a liveness check.</b> Sending Improv credentials to an already-connected board knocks it off and reports failure.</td>
+    <td>Query the device (HTTP/ping) or read the AP client list. Never re-provision to "check" a board.</td></tr>
+<tr><td><b>Absence of traffic is not absence of firmware.</b> Zero received frames is equally "wrong build" and "right build, nothing triggering a send".</td>
+    <td>Drive a stimulus you control, or read state directly, before concluding anything from silence.</td></tr>
+</table>
+
+<div class="warn"><b>Addresses 71 and 72 are the flame-effects trigger boards.</b> Never send a VALUE
+or PROGRAM command to them as part of a bench test. Polling is read-only and safe; driving an output
+is energising flame hardware from a test script. Use any non-flame LED module instead.</div>
+
+<h2>1. Range-finding walk — do this before tests 3 and 4</h2>
+<p class="kicker">Tests 3 and 4 need the two edge nodes <b>out of ESP-NOW range of each other</b> while
+each still reaches the router. That is a window, not simply "far apart": with the router midway at
+distance <i>d</i> from each edge, you need <b>R/2 &lt; d &lt; R</b>, where R is the real range of these
+boards. Estimates for R differ by more than 10&times; (a few hundred metres from typical ESP-NOW
+figures; roughly 20 m from this project's own bench RSSI reading), so measure it rather than assume.</p>
+
+<ol>
+<li>Flash <b>two</b> boards with the plain router build:
+<pre>cd WLED_dev/esp-now-router
+PLATFORMIO_BUILD_FLAGS='-DROUTER_WIFI_SSID=\"Lightbringer\" -DROUTER_WIFI_PASS=\"Morningstar\"' \
+  pio run -e esp32dev --target upload --upload-port /dev/cu.usbserial-XXXX</pre></li>
+<li>Leave board <b>A</b> at the bench on USB. Put board <b>B</b> on a battery.</li>
+<li>Walk B away in a straight line, stopping every 25 m (or every 5 m if you expect the short estimate).</li>
+<li>At each stop read board A — <b>A does the measuring</b>, because RSSI is recorded by the receiver.
+    B only needs power, so no laptop travels.
+<pre>curl -s http://&lt;A-ip&gt;/routes   # rssiDirect per origin — device-to-device, not the AP path
+curl -s http://&lt;A-ip&gt;/debug    # rxFrames should keep climbing while B is heard</pre></li>
+<li>The distance at which <code>rxFrames</code> stops advancing for B is <b>R</b>.</li>
+</ol>
+<div class="pass"><b>Result to record:</b> R in metres, plus the RSSI curve on the way out. Then place
+each edge at roughly <b>0.7&nbsp;R</b> for tests 3 and 4 — comfortably inside the window at both ends.</div>
+<div class="warn">If Lightbringer is down there is no HTTP. In that case the serial heartbeat on A shows
+WiFi state and channel but <b>not</b> receive counts, so it cannot tell you whether B is still heard.
+Ask for the 3-line <code>ROUTER_CHANNEL_DIAG</code> addition that prints <code>rxFrames</code> and the
+most recent origin RSSI before walking without a network.</div>
+
+<h2 class="pagebreak">2. ESP-NOW starts on the AP channel — closes the last open row on esp-now-router #6</h2>
+<p class="kicker">Highest value per minute: ~10 minutes, one board. This is the only claim on
+already-merged code that has not been re-verified since the fix was reworked.</p>
+<p><b>Needs:</b> one ESP32 devkit on USB · Lightbringer powered on.</p>
+<ol>
+<li>Identify the board (never trust the port name):
+<pre>ET=~/.platformio/packages/tool-esptoolpy/esptool.py
+PY=~/.platformio/penv/bin/python
+$PY $ET --port /dev/cu.usbserial-XXXX chip_id      # note the MAC</pre></li>
+<li>Erase, then flash the merged router build with credentials:
+<pre>$PY $ET --port /dev/cu.usbserial-XXXX erase_flash
+cd WLED_dev/esp-now-router
+PLATFORMIO_BUILD_FLAGS='-DROUTER_WIFI_SSID=\"Lightbringer\" -DROUTER_WIFI_PASS=\"Morningstar\" -DROUTER_CHANNEL_DIAG' \
+  pio run -e esp32dev --target upload --upload-port /dev/cu.usbserial-XXXX</pre></li>
+<li>Watch the console from reset for 90 seconds.</li>
+</ol>
+<div class="pass"><b>PASS:</b> one boot banner; a line <code>espnow: started, associated=1 channel=N</code>
+where N is Lightbringer's channel; <b>zero</b> <code>attach: advert send failed</code> in 90 s; the diag
+line shows <code>WiFi.status=3</code> with a real IP.</div>
+<div class="fail"><b>FAIL modes worth telling apart:</b> <code>rc=-3</code> is queue-full, meaning the
+radio is not transmitting — the original bug. <code>WiFi.status=1</code> means the SSID was not found
+(the AP is off or out of range), which is <b>not</b> a firmware failure. <code>status=6</code> means
+found but not associated — check the password.</div>
+
+<h2>3. Multi-hop relay — mesh backbone item 2</h2>
+<p><b>Needs:</b> three boards (1 router + 2 WLED edges on the <code>ampworks</code> build) · the
+separation from test 1 · Lightbringer up.</p>
+<ol>
+<li>Flash the router as in test 2. Flash both edges with the WLED <code>ampworks</code> env.
+    <b>Note:</b> <code>[env:ampworks]</code> cannot be USB-flashed by <code>pio -t upload</code> — it
+    OTAs to a hardcoded IP. Flash the artifacts directly:
+<pre>$PY $ET --chip esp32 --port /dev/cu.usbserial-XXXX --baud 460800 write_flash \
+  0x1000 bootloader.bin 0x8000 partitions.bin 0xe000 boot_app0.bin 0x10000 firmware.bin</pre></li>
+<li>Provision both edges to Lightbringer over Improv Serial (needs the AP up).</li>
+<li>Place edge A and edge C at ~0.7 R either side of the router; confirm with test 1's method that
+    <b>A cannot hear C directly</b>. This is the precondition — without it the test passes vacuously.</li>
+<li><b>Negative control first:</b> power the router <b>down</b>. Drive a state change on A. Confirm C does
+    <b>not</b> follow.</li>
+<li>Power the router up. Repeat the same drive on A.</li>
+</ol>
+<div class="pass"><b>PASS:</b> with the router down C does not change; with it up C follows. Delivery is
+loop-free and there is no duplicate wave.</div>
+<div class="warn">Skipping step 4 is the classic way to record a false pass — if A and C can hear each
+other directly, C follows whether or not the backbone works.</div>
+
+<h2>4. Multi-hop control — mesh backbone item 8</h2>
+<p><b>Needs:</b> same rig as test 3, plus a phone on the network.</p>
+<ol>
+<li>With the topology of test 3 verified, change a preset or effect from a phone attached to node A.</li>
+<li>Confirm every other node follows, including C across the router hop.</li>
+<li><b>Roaming:</b> move the phone to a different node mid-session; confirm control still works and the
+    installation does not revert to older state.</li>
+</ol>
+<div class="pass"><b>PASS:</b> fan-out reaches C via the backbone; roaming does not regress state.</div>
+
+<h2 class="pagebreak">5. Sensor-path regression — mesh backbone item 9</h2>
+<p><b>Needs:</b> an <b>MPR121</b> attached to an edge. Without one this test cannot fail and therefore
+proves nothing: <code>broadcastLocalState()</code> returns early with no sensor present.</p>
+<ol>
+<li>Attach the MPR121 to one edge; confirm touch events register locally first.</li>
+<li>Run control traffic (test 4) while generating touch events.</li>
+<li>Watch for sensor events being dropped or delayed — they share the 64-byte slot ring and channel
+    with control traffic.</li>
+</ol>
+<div class="pass"><b>PASS:</b> touch-sync still behaves while control traffic flows.</div>
+
+<h2>6. RS485 load and hitch watch — the one step still open on the bridge</h2>
+<p class="kicker">Steps 5&ndash;9 of RS485 bring-up are already discharged by the 2026-08-19 bench session
+(UDP &rarr; bridge(96) &rarr; RS485 @28000 &rarr; unreflashed module 72 &rarr; poll response relayed back,
+VALUE handled, counters agreeing). Only the load test remains, and it is the most valuable one left.</p>
+<p><b>Needs:</b> the led_driver board with its RS485 transceiver populated · a <b>non-flame</b> HMTL
+module on the bus to answer · both on the bus at 28000 baud.</p>
+<ol>
+<li>Record counters and the RS485 framing-error count <b>before</b> starting.</li>
+<li>Hold sustained UDP command traffic at the bridge — target 200 sustained sends — with the LEDs
+    running a busy effect.</li>
+<li>Watch throughout for: reboots, watchdog resets, visible LED-refresh hitching, and tx-drop counts.</li>
+<li>Record counters and framing errors <b>after</b>.</li>
+</ol>
+<div class="pass"><b>PASS:</b> no reboot, no watchdog, bounded tx-drop, no visible stutter, and framing
+errors <b>unchanged</b> — not merely "nothing looked wrong".</div>
+<div class="warn"><b>Why this one matters:</b> the same bench log recorded "one frame of a 4-frame burst
+(150 ms spacing) silently lost, succeeded on retry" — roughly 25% loss at a gentle rate.
+<code>sendMsgTo</code> blocks ~48 ms per frame at 28000 baud and is rate-limited to one frame per
+<code>loop()</code>. This test is the only check that says whether that is the rate limiter behaving as
+designed or something worse under load.</div>
+
+<h2>7. HMTL-over-HTTP bridge — the <code>POST /hmtl</code> path</h2>
+<p><b>Needs:</b> the same rig as test 6. Not covered by the 2026-08-19 run, which was UDP.</p>
+<ol>
+<li><b>Control first:</b> confirm the module answers a plain <b>UDP</b> poll. If UDP cannot reach it, an
+    HTTP failure says nothing about the bridge.</li>
+<li>POST a value command to a <b>non-flame</b> LED module via <code>POST /hmtl</code>; confirm the LED
+    <b>physically changes</b>.</li>
+<li>POST a POLL; confirm the response comes back in the HTTP reply and matches <b>byte-for-byte</b> what
+    the UDP path returns for the same poll.</li>
+<li>Issue an HTTP command while a UDP burst is in flight; record framing-error counts before and after.</li>
+</ol>
+<div class="fail"><b>An HTTP 200 is not evidence.</b> It is a value the endpoint controls and would pass
+with the bus unplugged. The physical LED change and the byte-identical reply are the claims.</div>
+
+<h2>8. LoRa RFM95 bench — esp-now-router Task A</h2>
+<p><b>Needs:</b> one SparkFun ESP32 LoRa 1-CH Gateway (WRL-15006) for item 1; a <b>second</b> for item 2.
+Three exist in the ecosystem (addresses 96, 97, 129) — 129 is the fire controller.</p>
+<div class="warn"><b>Build the right target.</b> Use
+<code>ArduinoLibs/platformio/RFM95Socket/RFM95_SocketTest</code>, env <code>esp32_lora_gw_a</code>.
+<b>Not</b> HMTL_Module's <code>esp32_lora_gw</code> — nothing in HMTL_Module includes
+<code>LoRa.h</code>, so that env compiles none of the library and comes up with no radio, presenting
+exactly like a hardware fault.</div>
+<ol>
+<li><b>Item 1 (one board):</b> flash <code>esp32_lora_gw_a</code>; confirm <code>initialized()</code>
+    returns true, the pin map is right, and there is no boot loop.</li>
+<li><b>Item 2 (two boards):</b> flash the peer with <code>esp32_lora_gw_b</code> — same sketch, addresses
+    swapped. Send from A to B and confirm B <b>accepts</b> a frame addressed to it and <b>ignores</b> one
+    addressed elsewhere. The negative half is the whole point: LoRa has no addressing of its own, and the
+    software filter is all that stops every node acting on every packet.</li>
+<li><b>Item 3:</b> confirm RS485 still works with the radio active on the same board.</li>
+</ol>
+<div class="warn"><b>Do not over-read a green.</b> <code>RFM95_SocketTest</code> is standalone and
+WLED-free, so the global-SPI collision does not apply to it. Passing proves the pin map and the radio;
+it does <b>not</b> license assuming the WLED path works, where the WS2801 bus claims VSPI first.</div>
+
+<footer>Sources: esp-now-router #6/#7 · docs/led-driver-esp32/BENCH-LOG.md (2026-08-19) ·
+docs/fire-controller-esp32/BENCH-LOG.md · WLED_dev todo plans · mesh exchange with the mac-mini
+todo-handler agent, 2026-08-28/29.</footer>
+
+</body>
+</html>
