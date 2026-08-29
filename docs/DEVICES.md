@@ -7,8 +7,8 @@ built, re-addressed, or retired.
 
 | Addr | Device | Board | Role |
 |---|---|---|---|
-| 71 | Trigger board 1 | AVR HMTL module | Lightbringer vehicle: igniter/pilot/large poofer |
-| 72 | Trigger board 2 | AVR HMTL module | Lightbringer vehicle: 4 accumulator poofs (was bench gateway via FTDI) |
+| 71 | Trigger board 1 | AVR HMTL module | Lightbringer vehicle: igniter/pilot/large poofer. Verified 2026-08-28: HMTL_Module v29 (current), bus round-trip to FC 128 ✓ |
+| 72 | Trigger board 2 | AVR HMTL module | Lightbringer vehicle: 4 accumulator poofs. Verified 2026-08-28: HMTL_Module v29 (current), bus round-trip to FC 128 ✓; sparkle boot program configured |
 | 96 | LED driver prototype | SparkFun ESP32 LoRa 1-CH Gateway (breadboard) | WLED `led_driver_wifi` env, WiFi "Acropolis", first WLED+RS485 board |
 | 97 | **Lightbringer Ceiling** | SparkFun ESP32 LoRa 1-CH Gateway (first non-breadboard build) | WLED `led_driver_ceiling` env — see below |
 | 129 | Fire controller | SparkFun ESP32 LoRa 1-CH Gateway | HMTL_Fire_Control_Wickerman (MPR121 touch, MCP23017 switches) |
