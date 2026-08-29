@@ -98,12 +98,12 @@ is for logic only — **LED power never touches the board.**
 
 ## 4. Level shifter — 74AHCT125, all four channels
 
-| Channel | In (ESP32) | Out (strip) | Signal |
-|---|---|---|---|
-| 1 (pins 1A/1Y) | GPIO 25 | bus 1 DATA  | |
-| 2 (2A/2Y)      | GPIO 23 | bus 1 CLOCK | |
-| 3 (3A/3Y)      | GPIO 21 | bus 2 DATA  | |
-| 4 (4A/4Y)      | GPIO 22 | bus 2 CLOCK | |
+| Channel        | In (ESP32) | Out (strip) | Signal |
+| -------------- | ---------- | ----------- | ------ |
+| 1 (pins 1A/1Y) | GPIO 25    | bus 1 DATA  |        |
+| 2 (2A/2Y)      | GPIO 23    | bus 1 CLOCK |        |
+| 3 (3A/3Y)      | GPIO 21    | bus 2 DATA  |        |
+| 4 (4A/4Y)      | GPIO 22    | bus 2 CLOCK |        |
 
 All four /OE pins (1, 4, 10, 13) to GND. VCC (14) = 5V, GND (7) = GND, 100 nF decoupler across
 VCC/GND at the chip. Optional but cheap insurance on 400-px runs: 33–100 Ω series resistor on
