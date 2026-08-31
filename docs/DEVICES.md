@@ -41,11 +41,15 @@ extension per `led-driver-esp32/WIRING.md` §8).
   board's AP, along with the playa network list (Lightbringer → jetpack →
   CBCI-0970); verified by cfg read-back. (Mode bitfield: 1=send,
   2=receive; exactly one sender per network.)
-- **Firmware OTA pending 2026-08-30**: still on the 2026-08-21 build
-  (ac4f655e); a current-main build (eb14ddb7, RS485 bridge fixes #19-21)
-  is staged — AP-side OTA is blocked by WLED's same-subnet guard (station
-  iface empty in AP mode → 401), so it needs a LAN path: board and laptop
-  on the same network (Lightbringer-with-Starlink, or jetpack failover).
+- **Firmware UPDATED 2026-08-30** to current main (eb14ddb7, RS485 bridge
+  fixes #19-21) via direct USB serial after network paths failed (note:
+  AP-side OTA 401s — WLED's same-subnet guard computes from the empty
+  station iface in AP mode). Verified on-Lightbringer at 192.168.68.52
+  after flash, config intact.
+- **PENDING: AP fallback rename** to SSID `LightbringerCeiling` pass
+  `morningstar` (currently default WLED-AP/wled1234) — needs one HTTP cfg
+  POST from the Lightbringer LAN or the board's AP:
+  `{"ap":{"ssid":"LightbringerCeiling","psk":"morningstar"}}` + reboot.
 - **Context:** the Lightbringer is a Burning Man mutant vehicle — its
   network/location changes.
 
