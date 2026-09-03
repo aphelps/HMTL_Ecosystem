@@ -46,10 +46,23 @@ extension per `led-driver-esp32/WIRING.md` §8).
   AP-side OTA 401s — WLED's same-subnet guard computes from the empty
   station iface in AP mode). Verified on-Lightbringer at 192.168.68.52
   after flash, config intact.
-- **PENDING: AP fallback rename** to SSID `LightbringerCeiling` pass
-  `morningstar` (currently default WLED-AP/wled1234) — needs one HTTP cfg
-  POST from the Lightbringer LAN or the board's AP:
-  `{"ap":{"ssid":"LightbringerCeiling","psk":"morningstar"}}` + reboot.
+- **Power-up quirk (diagnosed 2026-09-02 on playa)**: cold-starting from
+  the 12V→5V converter alone leaves the ESP32 latched unbooted — the
+  converter's slow output ramp never produces a valid power-on reset
+  (rail measures fine; the RESET button instantly recovers it, and USB
+  plugged later does NOT since the rail never drops). Working sequences:
+  USB or bench 5V first, then 12V. Deployed fix: board powered from an
+  always-on USB outlet, converter feeds only the LED rail. Note: USB 5V
+  and the LED rail are bridged somewhere (USB-only lights the strand
+  dimly) — backfeed between supplies; cut the bridge if it causes
+  trouble. Bulletproof fix for the fleet parts order: APX803/MIC803-class
+  voltage supervisor on EN.
+- **AP fallback renamed 2026-09-02**: SSID `LightbringerCeiling` pass
+  `morningstar` (verified by cfg read-back). Same session: **static IP
+  192.168.68.97** (gw .68.1, sn 255.255.252.0 — the /22 matters) set on
+  the Lightbringer network entry; fallback networks now BRC CAMP 26 and
+  CBCI-0970 (jetpack dropped). Board rejoined Lightbringer on the static
+  address, confirmed by Adam.
 - **Context:** the Lightbringer is a Burning Man mutant vehicle — its
   network/location changes.
 
